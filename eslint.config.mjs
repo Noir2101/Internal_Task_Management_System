@@ -32,4 +32,27 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
+  // Cổng cơ học 1 — domain purity (docs/07 §2.1). Vi phạm = lỗi build.
+  {
+    files: ['src/tasks/domain/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['@prisma/client', '@prisma/*'], message: 'domain không được biết Prisma — map ở adapter.' },
+          { group: ['@nestjs/*'],                    message: 'domain thuần, không phụ thuộc framework.' },
+          { group: ['**/infrastructure/**'],         message: 'mũi tên chỉ vào trong; domain không biết infrastructure.' },
+        ],
+      }],
+    },
+  },
+  {
+    files: ['src/stats/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['@prisma/client'], message: 'Stats chỉ đọc qua TaskQueryPort, không Prisma trực tiếp.' },
+        ],
+      }],
+    },
+  },
 );
