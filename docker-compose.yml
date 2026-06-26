@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: itms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: itms
+      POSTGRES_PASSWORD: itms
+      POSTGRES_DB: itms
+    ports:
+      - "5433:5432" # host:container — 5433 để tránh đụng Postgres mặc định (5432) trên máy
+    volumes:
+      - itms_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U itms -d itms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  itms_pgdata:

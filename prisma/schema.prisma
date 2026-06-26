@@ -1,0 +1,98 @@
+// schema.prisma — GĐ5 Data schema (Internal Task Management System)
+// Nguồn sự thật cho cấu trúc DB. CÁC RÀNG BUỘC PRISMA KHÔNG MODEL ĐƯỢC nằm trong
+// migration thủ công (--create-only) — xem các dòng [RAW SQL] bên dưới:
+//   - CHECK user_admin_no_team        teamId NULL ⟺ role=ADMIN
+//   - CHECK task_title_not_blank      title không rỗng / chỉ khoảng trắng
+//   - UNIQUE (partial) ≤1 LEADER/team User(teamId) WHERE role='LEADER'
+//   - INDEX  (partial) OVERDUE        Task(deadline) WHERE progress<>'DONE' AND deletedAt IS NULL
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// — Enums native PG (tập đóng, ổn định) —
+enum Role {
+  ADMIN
+  LEADER
+  MEMBER
+}
+
+enum Progress {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+// — User: admin đứng ngoài cây (teamId NULL); leader/member thuộc đúng 1 nhóm —
+model User {
+  id           String   @id @default(cuid(2))
+  email        String   @unique
+  passwordHash String                                       // argon2/bcrypt (SEC-01) — salt nhúng trong hash
+  name         String
+  role         Role
+  teamId       String?                                      // admin NULL; leader/member NOT NULL (CHECK [RAW SQL])
+  isActive     Boolean  @default(true)                      // soft-deactivate (đảo ngược được) — KHÁC tombstone của Task
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt      @db.Timestamptz(3)
+
+  // onDelete: Restrict — override mặc định SetNull của quan hệ optional (SetNull sẽ vỡ CHECK)
+  team          Team?          @relation(fields: [teamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ownedTasks    Task[]         @relation("TaskOwner")
+  assignedTasks Task[]         @relation("TaskAssignee")
+  refreshTokens RefreshToken[]
+
+  @@index([teamId])
+  // [RAW SQL] CREATE UNIQUE INDEX user_one_leader_per_team ON "User"("teamId") WHERE role = 'LEADER';
+}
+
+// — Team: KHÔNG có leader_id (leadership derive từ User role+teamId) —
+model Team {
+  id        String   @id @default(cuid(2))
+  name      String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt      @db.Timestamptz(3)
+
+  members User[] // quan hệ DUY NHẤT User↔Team → không cần đặt tên
+}
+
+// — Task: owner≠assignee; KHÔNG có teamId (scope = assignee.teamId, suy ra) —
+model Task {
+  id          String    @id @default(cuid(2))
+  title       String                                        // NOT NULL + CHECK length(trim)>0 [RAW SQL]
+  description String?
+  progress    Progress  @default(TODO)
+  deadline    DateTime? @db.Timestamptz(3)                  // NULL ⇒ không bao giờ OVERDUE
+  ownerId     String
+  assigneeId  String
+  deletedAt   DateTime? @db.Timestamptz(3)                  // soft-delete tombstone (giữ lịch sử)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt      @db.Timestamptz(3)
+
+  owner    User @relation("TaskOwner",    fields: [ownerId],    references: [id], onDelete: Restrict)
+  assignee User @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+
+  @@index([assigneeId, progress])
+  // [RAW SQL] CREATE INDEX task_overdue ON "Task"(deadline) WHERE progress <> 'DONE' AND "deletedAt" IS NULL;
+}
+
+// — RefreshToken: rotation + reuse-detection; lưu SHA-256, không token thô —
+model RefreshToken {
+  id        String    @id @default(cuid(2))
+  tokenHash String    @unique                               // SHA-256 (tất định) — KHÔNG bcrypt (không tra cứu được)
+  userId    String
+  familyId  String                                          // lineage: cả chuỗi rotation cùng familyId
+  usedAt    DateTime? @db.Timestamptz(3)                    // set khi bị rotate (đã đẻ con) → trình lại = reuse
+  revokedAt DateTime? @db.Timestamptz(3)                    // set khi logout / family-revoke (trực giao với usedAt)
+  expiresAt DateTime  @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // auth-state vứt được
+
+  @@index([familyId])
+  @@index([userId])
+}
