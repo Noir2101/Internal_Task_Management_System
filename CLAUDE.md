@@ -13,7 +13,7 @@ một rule đã viết.
 
 ## Stack & lệnh
 
-- NestJS + Postgres + Prisma. (React FE same-origin — ngoài phạm vi GĐ7 backend.)
+- NestJS + Postgres + Prisma **pin v6.19** (v7 bỏ `url=env()` → phá schema/seed; đừng bump). (React FE same-origin — ngoài phạm vi GĐ7 backend.)
 - `npm run start:dev` · `npm run lint` · `npm test` · `npm run build`
 - Prisma: dùng `/migrate`. KHÔNG `prisma db push`, KHÔNG `prisma migrate reset`.
 - Prefix tĩnh `/api/v1`. Swagger ở `/api/v1/docs`.
@@ -79,6 +79,8 @@ Nhãn: **[GATE]** = cổng cơ học (lint/test/provider) fail nếu vi phạm �
 Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Trình tự build (nền ngang trước, lát dọc sau)
+
+> Trạng thái: **Bước 1 ✅** (walking skeleton + 3 cổng). Kế: **Bước 2 — Auth (thin)**.
 
 1. **Walking skeleton:** Nest scaffold · Prisma wire · **migration đầu `--create-only` + 4 raw-SQL** (xem `/migrate`) · seed · global ValidationPipe + exception filter (envelope + **requestId**) · prefix `/api/v1` · Swagger · `GET /health` chạm DB. **Dựng luôn 3 cổng cơ học.**
 2. **Auth (thin):** login/refresh-rotate/logout/me · RefreshToken store · rotation + reuse-detection · hashing = argon2 (khớp seed) · JWT guard + claims `sub/role/teamId`. (throttle để bước 7)
