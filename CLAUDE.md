@@ -80,16 +80,16 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Trình tự build (nền ngang trước, lát dọc sau)
 
-> Trạng thái: **Bước 1 ✅** (walking skeleton + 3 cổng). Kế: **Bước 2 — Auth (thin)**.
+> Trạng thái: **Bước 1–2 ✅** (skeleton + 3 cổng · auth thin: login/refresh-rotate/logout/me). Kế: **Bước 3 — Common authz scaffold**.
 
 1. **Walking skeleton:** Nest scaffold · Prisma wire · **migration đầu `--create-only` + 4 raw-SQL** (xem `/migrate`) · seed · global ValidationPipe + exception filter (envelope + **requestId**) · prefix `/api/v1` · Swagger · `GET /health` chạm DB. **Dựng luôn 3 cổng cơ học.**
 2. **Auth (thin):** login/refresh-rotate/logout/me · RefreshToken store · rotation + reuse-detection · hashing = argon2 (khớp seed) · JWT guard + claims `sub/role/teamId`. (throttle để bước 7)
 3. **Common authz scaffold:** `RolesGuard` · `@CurrentUser` · domain-exception `NotFound`/`Forbidden` + map sang HTTP · helper scoped-repo. **KHÔNG `TaskPolicy` ở đây** — nó thuộc Tasks.
 4. **Tasks (deep — trái tim, realize keystone):** domain → ports → use-cases → `PrismaTaskRepository` (scoped-load) → interface + DTO + projection. **Keystone-first:** lát mỏng nhất `GET /tasks/:id` qua scoped-load → 404/403 + projection, khoá bằng test, làm template cho mọi endpoint sau. Test-as-you-go CHỈ keystone domain.
-5. **Users + Teams (thin):** leader-swap atomic · deactivate → `orphanedTaskCount` + Notifier · reactivate · CHECK-lên-DTO · roster `GET /teams/:id/members`.
+5. **Users + Teams (thin):** leader-swap atomic · deactivate → `orphanedTaskCount` + Notifier + **revoke refresh token của user** (đóng deviation Bước 2) · reactivate · CHECK-lên-DTO · roster `GET /teams/:id/members`.
 6. **Stats (read-model):** `byProgress` + `byAssignee` outer-join + `overdue`; 3 bất biến OVERDUE; CHỈ qua `TaskQueryPort`.
 7. **Hardening:** Prisma-error → HTTP (P2002…) · break-glass `DELETE /teams/:id` + log seam · throttle auth · Swagger polish (4 example khó).
 
 ## Lái Claude Code
 
-plan-mode → người review đối chiếu hợp đồng → execute. Chạy `/check-spine` trước mỗi commit.
+Trình tự mỗi bước: plan-mode → người review đối chiếu hợp đồng → execute → `/check-spine` → `/sync-docs` (gồm ghi `deviations-log` + `implementation-log` nếu khớp). Chạy nguyên chuỗi này trước **mỗi** commit.

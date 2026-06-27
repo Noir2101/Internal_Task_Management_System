@@ -1,6 +1,7 @@
 import { ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import {
   ErrorDetail,
@@ -32,6 +33,8 @@ async function bootstrap(): Promise<void> {
 
   // requestId chạy sớm nhất, trước routing → có mặt cả ở 404.
   app.use(requestIdMiddleware);
+  // Parse Cookie header → req.cookies (refresh token đọc ở /auth/refresh, /auth/logout).
+  app.use(cookieParser());
 
   app.setGlobalPrefix('api/v1');
 
