@@ -1,5 +1,5 @@
 ---
-description: Sau khi /check-spine xanh, tự xét xem bước vừa xong có cần cập nhật docs/CLAUDE.md không. Mặc định KHÔNG sửa; chỉ sửa khi khớp đúng tiêu chí.
+description: Sau khi /check-spine xanh, xét cập nhật docs/CLAUDE.md (default KHÔNG sửa) và ghi deviations-log/implementation-log nếu khớp (append-only). Chỉ sửa spine khi khớp đúng tiêu chí.
 ---
 
 Bước vừa code xong và `/check-spine` đã xanh. Xét xem có cần cập nhật tài liệu trước khi commit không.
@@ -36,11 +36,30 @@ Một **quyết định kiến trúc mới** được chốt giữa đường m�
 quyết định đã có trong doc (ví dụ đổi thư viện projection, đổi cách bơm Clock). Thêm đúng một mục
 ngắn theo đúng giọng của doc (lý do + đánh đổi), KHÔNG viết lại mục đã có trừ khi nó sai.
 
+## docs/deviations-log.md + docs/implementation-log.md — GHI khi khớp (append-only)
+
+Khác bốn mục trên (default KHÔNG sửa spine), hai log này là **truy vết append-only** — default là
+**GHI nếu khớp**, không phải để trống. Theo đúng format có sẵn trong mỗi file; không cần hỏi trước
+khi thêm entry (đây là ghi nhận, không phải đổi hợp đồng).
+
+- **deviations-log.md** — khi bước vừa xong gặp chỗ hợp đồng (docs/00–06) **im lặng** mà code phải
+  chọn một giá trị cụ thể để chạy được (tên biến, gate theo NODE_ENV, hành vi edge-case spine không
+  nói). Nếu quyết định có hạn đóng (một bước sau phải quay lại), ghi "đóng ở Bước N" + cân nhắc một
+  dòng nhắc trong `CLAUDE.md` ở bước đó nếu rủi ro quên cao.
+- **implementation-log.md** — khi verify/test bắt được một **bug thật** có nguyên nhân gốc đáng nhớ
+  (race condition, sai tầng, nhầm transaction semantics, off-by-one), hoặc một quyết định kỹ thuật
+  không hiển nhiên từ diff.
+- **KHÔNG ghi:** lỗi cú pháp/lint vụn, refactor không đổi hành vi, hay quyết định đã có sẵn trong
+  CLAUDE.md/docs (ghi lại cái đã rõ là nhiễu). Không có gì khớp → nói "không có entry mới", đừng tạo
+  entry rỗng cho có.
+
 ## Việc phải làm
 
-1. Tự hỏi: bước vừa xong có khớp đúng MỘT tiêu chí "sửa CHỈ KHI" nào ở trên không?
-   - Không khớp tiêu chí nào → báo "Không cần cập nhật tài liệu" và dừng. Đây là kết quả phổ biến nhất.
-   - Khớp → liệt kê CHÍNH XÁC tiêu chí nào khớp, file nào, và đoạn dự định thêm/sửa (ngắn nhất có thể).
-2. Nếu khớp, hỏi người xác nhận trước khi sửa file — đừng tự sửa rồi báo sau.
+1. **Spine + CLAUDE.md (bốn mục đầu):** bước vừa xong có khớp đúng MỘT tiêu chí "sửa CHỈ KHI" không?
+   - Không khớp → báo "Không cần cập nhật spine" rồi sang bước 2. Đây là kết quả phổ biến nhất.
+   - Khớp → liệt kê CHÍNH XÁC tiêu chí nào, file nào, đoạn dự định (ngắn nhất). **Hỏi người xác nhận
+     trước khi sửa** — đừng tự sửa rồi báo sau.
+2. **Hai log (append-only):** rà theo tiêu chí mục trên. Khớp → thêm entry theo format (không cần
+   hỏi). Không khớp → nói "không có entry mới".
 3. Nếu sửa `CLAUDE.md`, không thêm prose mới ngoài đúng dòng/mục cần — file này đọc mỗi lượt,
    phình ra là loãng attention của mọi phiên sau.

@@ -92,4 +92,4 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Lái Claude Code
 
-plan-mode → người review đối chiếu hợp đồng → execute. Chạy `/check-spine` trước mỗi commit.
+Trình tự mỗi bước: plan-mode → người review đối chiếu hợp đồng → execute → `/check-spine` → `/sync-docs` (gồm ghi `deviations-log` + `implementation-log` nếu khớp). Chạy nguyên chuỗi này trước **mỗi** commit.
