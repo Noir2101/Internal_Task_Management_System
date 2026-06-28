@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AppException, ErrorDetail } from './exceptions/app.exception';
+import { ForbiddenError, NotFoundError } from './exceptions/domain.exception';
 
 interface ErrorEnvelope {
   statusCode: number;
@@ -40,6 +41,7 @@ const STATUS_CODE_MAP: Record<number, string> = {
 /**
  * Filter toàn cục → envelope thống nhất {statusCode,error,code,message,timestamp,path,requestId}.
  * - AppException: dùng code/status/message của nó (+ details nếu là ValidationException).
+ * - Domain-exception (NotFoundError/ForbiddenError): map → 404 RESOURCE_NOT_FOUND / 403 + code cụ thể.
  * - HttpException built-in: map status→code chung; status lạ coi như gap nội bộ → 500.
  * - Khác: 500 INTERNAL_ERROR, log đầy đủ server-side; client không thấy stack/details.
  * Bước 7 cắm thêm nhánh Prisma-error (P2002…) vào đây.
@@ -64,6 +66,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code = exception.code;
       message = exception.message;
       details = exception.details;
+    } else if (exception instanceof NotFoundError) {
+      // Domain-exception (framework-agnostic) → envelope. 404 luôn dùng code chung (docs/06 §7.3).
+      status = HttpStatus.NOT_FOUND;
+      code = 'RESOURCE_NOT_FOUND';
+      message = exception.message;
+    } else if (exception instanceof ForbiddenError) {
+      // 403 mang code cụ thể từ registry (vd NOT_TASK_OWNER, FORBIDDEN).
+      status = HttpStatus.FORBIDDEN;
+      code = exception.code;
+      message = exception.message;
     } else if (exception instanceof HttpException) {
       const rawStatus = exception.getStatus();
       const mapped = STATUS_CODE_MAP[rawStatus];

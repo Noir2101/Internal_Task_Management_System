@@ -5,11 +5,19 @@ description: Sau khi /check-spine xanh, xét cập nhật docs/CLAUDE.md (defaul
 Bước vừa code xong và `/check-spine` đã xanh. Xét xem có cần cập nhật tài liệu trước khi commit không.
 **Mặc định là KHÔNG sửa gì.** Chỉ sửa khi khớp đúng một tiêu chí dưới đây — đừng "dọn dẹp" hay tổng kết phiên.
 
-## docs/00 tới docs/06 — KHÔNG đụng
+## docs/00 tới docs/06 — agent KHÔNG tự sửa
 
-Đây là spine đã đông cứng từ trước GĐ7. Chỉ sửa nếu bạn phát hiện một **lỗi thật** (mâu thuẫn nội tại,
-sai logic) — và trong trường hợp đó, KHÔNG tự sửa. Báo cho người, trích đúng đoạn mâu thuẫn,
-và dừng. Việc code GĐ7 không bao giờ là lý do để đổi những file này.
+Đây là spine đã đông cứng từ trước GĐ7. Agent KHÔNG bao giờ tự sửa các file này. Hai ca, phân biệt rõ:
+
+- **Lỗi thật trong spine** (mâu thuẫn nội tại, sai logic) → KHÔNG tự sửa. Báo người, trích đúng đoạn
+  mâu thuẫn, và dừng.
+- **GĐ7 cần BỔ SUNG một phần FE-observable mà spine chưa liệt kê** (code lỗi mới, status mới, field
+  shape mới mà hệ SẼ phát ra — vd `FORBIDDEN` cho role-deny ở Bước 3) → vẫn KHÔNG tự sửa docs/06. Ghi
+  `deviations-log` NGAY với `Loại: chờ-bổ-sung-spine → docs/06 §X, Bước N`. Khi phần đó GO-LIVE
+  (endpoint thật phát code), NGƯỜI duyệt một amendment có-đánh-dấu vào docs/06 — vì registry §7.3 phải
+  đầy đủ (FE rẽ nhánh CHỈ trên `code`); để hệ emit một code mà registry thiếu = hợp đồng tự mâu thuẫn.
+
+Việc code GĐ7 không bao giờ là lý do để agent tự đổi những file này.
 
 ## CLAUDE.md (root) — sửa CHỈ KHI
 
