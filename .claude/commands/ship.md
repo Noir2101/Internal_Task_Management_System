@@ -1,5 +1,5 @@
 ---
-description: Tự động hoá nguyên chuỗi giao việc git → commit → push → PR → squash-merge (resolve conflict nếu có) → xoá branch remote+local → về main pull. Squash merge, Conventional Commits.
+description: Tự động hoá nguyên chuỗi giao việc git → commit → push → PR → merge commit --no-ff (resolve conflict nếu có) → xoá branch remote+local → về main pull. Merge commit (KHÔNG squash), Conventional Commits tiếng Anh.
 argument-hint: "[--dry-run] [ghi chú commit/PR tuỳ chọn]"
 ---
 
@@ -33,10 +33,13 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
   `db`/`prisma` (prisma/) · `docs` (docs/) · `harness` (.claude/, scripts/). Đa-vùng → chọn vùng cốt lõi
   hoặc bỏ scope. **Một commit = một mục đích**; trộn feat với chore thì TÁCH thành 2 commit.
 - `subject` mô tả KẾT QUẢ, không phải thao tác ("add roles guard" không phải "edit file").
+- **Toàn bộ text tiếng Anh**, kể cả mốc giai đoạn của dự án: viết "phase 7 step 3", KHÔNG để
+  "GĐ7 Bước 3" / "Bước 3" lọt vào subject hay body.
 
-**Commit lúc merge** (squash → 1 commit trên main): GitHub lấy **PR title** làm subject squash, nên
-**PR title cũng phải đúng Conventional Commits** (GitHub tự thêm ` (#N)`). Squash body = phần tóm tắt PR.
-Không để mặc định "Merge pull request…".
+**Commit lúc merge** (merge commit `--no-ff` → giữ commit nhánh + 1 merge commit trên main):
+merge commit có message RIÊNG, soạn bằng **tiếng Anh** đúng Conventional Commits y như commit thường
+— subject + body, KHÔNG để mặc định "Merge pull request…". **KHÔNG squash.** Vì `--no-ff` giữ lại
+commit nhánh, mỗi commit nhánh cũng phải tự sạch (đã theo convention trên).
 
 ## Các bước (thực thi tuần tự; in kết quả gọn từng bước)
 
@@ -69,7 +72,7 @@ Không để mặc định "Merge pull request…".
 
 **4. Tạo / lấy PR.** `gh pr view <branch> --json number,url,state` để xem PR đã tồn tại chưa.
    - Chưa có → `gh pr create --base main --head <branch> --title "<PR title Conventional>" --body "<body>"`.
-     - PR title = subject squash dự kiến (xem convention merge). PR body: **## Tóm tắt** (cái gì + tại sao) ·
+     - PR title = Conventional Commits **tiếng Anh** (mô tả PR). PR body: **## Summary** (cái gì + tại sao) ·
        **## Test** (lint/test/build xanh + verify nếu có) · nhét ghi chú từ `$ARGUMENTS` nếu có.
    - Đã có (open) → tái dùng, cập nhật title/body nếu lệch (`gh pr edit`).
 
@@ -77,24 +80,26 @@ Không để mặc định "Merge pull request…".
    - `git merge --no-edit origin/main`.
    - **Sạch / already up-to-date** → tiếp Bước 6.
    - **Conflict** → mở từng file conflict, hợp nhất giữ đúng ý cả hai phía (đọc context, không bỏ bừa).
-     `git add <file đã giải>` → `git commit --no-edit` (merge commit; squash sẽ làm phẳng sau) →
+     `git add <file đã giải>` → `git commit --no-edit` (merge commit hợp nhất main vào branch) →
      `git push`. Không chắc cách hợp nhất → `git merge --abort`, DỪNG, báo người.
 
-**6. Squash-merge PR.**
-   `gh pr merge <branch> --squash --delete-branch --subject "<PR title>" --body "<squash body>"`.
+**6. Merge PR (merge commit `--no-ff`, KHÔNG squash).**
+   `gh pr merge <branch> --merge --delete-branch --subject "<English Conventional subject>" --body "<English body>"`.
+   - `--merge` tạo merge commit, GIỮ nguyên các commit nhánh trên main. Subject + body **bằng tiếng Anh**
+     (đừng để mặc định "Merge pull request…", đừng để tiếng Việt/mốc "Bước N" lọt vào).
    - `--delete-branch` xoá branch **remote** (và local nếu gh làm được).
    - Báo "not mergeable"/conflict do GitHub phát hiện → quay lại Bước 5.
    - Bị required-check/approval/branch-protection chặn → DỪNG, báo người (KHÔNG `--admin`).
 
 **7. Dọn local + về main.**
    - `git switch main` (no-op nếu gh đã chuyển).
-   - `git pull --ff-only origin main` (kéo commit squash về).
+   - `git pull --ff-only origin main` (kéo merge commit về).
    - `git fetch --prune` (dọn ref remote đã xoá).
-   - Branch local còn sót (`git rev-parse --verify --quiet <branch>`) → `git branch -D <branch>`
-     (squash khiến git coi branch "chưa merge" nên `-d` sẽ từ chối; `-D` là đúng SAU khi đã xác nhận PR merged).
+   - Branch local còn sót (`git rev-parse --verify --quiet <branch>`) → `git branch -d <branch>`
+     (merge commit `--no-ff` khiến branch thật sự đã-merged nên `-d` an toàn chạy được; chỉ fallback `-D` nếu `-d` từ chối).
 
 **8. Báo cáo.** In: commit subject đã tạo · URL PR · trạng thái merge · branch đã xoá (remote+local) ·
-   `git log --oneline -3` trên main để xác nhận commit squash đã đáp xuống.
+   `git log --oneline -3` trên main để xác nhận merge commit đã đáp xuống.
 
 ## Khi nào KHÔNG dùng /ship
 
