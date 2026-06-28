@@ -55,4 +55,17 @@ export default tseslint.config(
       }],
     },
   },
+  // Cổng cơ học 1 (mở rộng) — application chỉ phụ thuộc PORT (abstraction), KHÔNG Prisma/infrastructure.
+  // (@nestjs/* vẫn cho phép: use-case là @Injectable, inject port qua @Inject token.)
+  {
+    files: ['src/tasks/application/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['@prisma/client', '@prisma/*'], message: 'application không chạm Prisma — qua port + map ở adapter.' },
+          { group: ['**/infrastructure/**'],         message: 'application phụ thuộc port (abstraction), không hiện thực.' },
+        ],
+      }],
+    },
+  },
 );
