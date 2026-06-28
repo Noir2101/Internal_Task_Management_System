@@ -1,4 +1,4 @@
-import type { AccessClaims } from '../../auth/auth.types';
+import type { AccessClaims } from '../auth-claims';
 
 export {};
 

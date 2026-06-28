@@ -6,14 +6,13 @@ import {
   Post,
   Req,
   Res,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import { Public } from '../common/authz/public.decorator';
 import { AuthService } from './auth.service';
 import { AuthUserResponse } from './dto/auth-user.response';
 import { LoginDto } from './dto/login.dto';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import {
   clearRefreshCookie,
   readRefreshCookie,
@@ -31,6 +30,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
+  @Public()
   @HttpCode(200) // §6.2: login trả 200 (không phải 201 mặc định của POST)
   async login(
     @Body() dto: LoginDto,
@@ -45,6 +45,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   @HttpCode(200) // §6.2: refresh trả 200 (không phải 201 mặc định của POST)
   async refresh(
     @Req() req: Request,
@@ -64,6 +65,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Public()
   @HttpCode(204)
   async logout(
     @Req() req: Request,
@@ -75,9 +77,8 @@ export class AuthController {
 
   @Get('me')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   async me(@Req() req: Request): Promise<{ user: AuthUserResponse }> {
-    // req.user do JwtAuthGuard gắn; guard đã chặn nếu thiếu/hỏng token.
+    // Không @Public → global JwtAuthGuard đã chặn nếu thiếu/hỏng token và gắn req.user.
     const user = await this.auth.me(req.user!.sub);
     return { user };
   }

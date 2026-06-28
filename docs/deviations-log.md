@@ -7,10 +7,15 @@
 > Khi đọc lại code và thấy "tại sao chỗ này làm vậy mà sáu doc không nói" — tra ở đây trước khi
 > nghi là bug.
 
-Quy ước mỗi entry:
+Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
+- **phụ-lục-vĩnh-viễn** — hợp đồng IM LẶNG (không nói), quyết định ở đây là chỗ ở mãi mãi.
+- **chờ-bổ-sung-spine** — hợp đồng ĐÓNG nhưng thiếu một phần **FE-observable** (code/status/field hệ
+  SẼ phát ra). Entry này là tạm: khi phần đó GO-LIVE, phải tốt nghiệp lên docs/06 §X (người duyệt),
+  rồi đóng entry. Đừng để nó kẹt ở phụ lục.
 
 ```
 ### <tiêu đề ngắn>
+- Loại: phụ-lục-vĩnh-viễn | chờ-bổ-sung-spine (→ docs/06 §X, Bước N)
 - Trạng thái: mở | đã đóng (đóng ở Bước N, ngày ...)
 - Vị trí: file:line
 - Hợp đồng nói gì: ...
@@ -21,6 +26,7 @@ Quy ước mỗi entry:
 ---
 
 ### `GET /health` — vị trí so với prefix + shape response (Bước 1)
+- Loại: phụ-lục-vĩnh-viễn
 - Trạng thái: mở (endpoint hạ tầng, ngoài surface hợp đồng — không có hạn đóng)
 - Vị trí: src/health/health.controller.ts:14
 - Hợp đồng nói gì: docs/06 không liệt kê `/health` — nó là endpoint hạ tầng, ngoài contract surface.
@@ -30,6 +36,7 @@ Quy ước mỗi entry:
 ---
 
 ### Cookie `Secure` gate theo `NODE_ENV` (Bước 2)
+- Loại: phụ-lục-vĩnh-viễn
 - Trạng thái: mở (không có hạn đóng — prod luôn set Secure)
 - Vị trí: src/auth/refresh-cookie.ts:13
 - Hợp đồng nói gì: §6.4 liệt kê thuộc tính cookie `Secure` (literal, không điều kiện).
@@ -39,6 +46,7 @@ Quy ước mỗi entry:
 ---
 
 ### `POST /auth/refresh` không chặn user `isActive=false` (Bước 2)
+- Loại: phụ-lục-vĩnh-viễn (không đẻ code FE-observable; chỉ là quyết định KHÔNG thêm nhánh)
 - Trạng thái: mở (đóng ở Bước 5 — luồng deactivate thu hồi refresh token của user)
 - Vị trí: src/auth/auth.service.ts:110
 - Hợp đồng nói gì: §6.2 chỉ liệt kê 200 + SESSION_EXPIRED cho refresh; im lặng về isActive.
@@ -48,6 +56,7 @@ Quy ước mỗi entry:
 ---
 
 ### Tên biến .env cho JWT/refresh (Bước 2)
+- Loại: phụ-lục-vĩnh-viễn
 - Trạng thái: mở (không có hạn đóng)
 - Vị trí: src/auth/auth.module.ts:16, src/auth/auth.service.ts:44
 - Hợp đồng nói gì: docs/06 không đặt tên biến môi trường.
@@ -57,6 +66,7 @@ Quy ước mỗi entry:
 ---
 
 ### `GET /auth/me` khi token hợp lệ nhưng user biến mất (Bước 2)
+- Loại: phụ-lục-vĩnh-viễn
 - Trạng thái: mở (edge phòng thủ; không có hạn đóng)
 - Vị trí: src/auth/auth.service.ts:131
 - Hợp đồng nói gì: §6.2 chỉ mô tả 200 {user}; im lặng ca user không còn.
@@ -65,6 +75,20 @@ Quy ước mỗi entry:
 
 ---
 
+### Code 403 `FORBIDDEN` cho role-deny ở rìa — split theo keystone (Bước 3)
+- Loại: **chờ-bổ-sung-spine** → docs/06 §7.3, Bước 6 (khi `/stats` thật sự phát `FORBIDDEN`, người duyệt thêm dòng `FORBIDDEN | 403` vào registry rồi đóng entry này)
+- Trạng thái: mở (chưa call-site nào phát — `DenyMode` mới là convention; `/stats` leader-only là Bước 6, `/users`,`/teams` admin-only ở Bước 5 đi nhánh hide→404 nên KHÔNG đẻ code)
+- Vị trí: src/common/authz/roles.decorator.ts:13 (type `DenyMode`) + :23 (default code `FORBIDDEN`), src/common/authz/roles.guard.ts:42 (throw `ForbiddenError`)
+- Hợp đồng nói gì: registry §7.3 KHÔNG có code 403 chung cho "sai vai trò ở rìa" — chỉ có code record-level cụ thể (`NOT_TASK_OWNER`...). §5 lại nói `/stats` dùng 403; §3.3 nói admin có phạm vi toàn hệ thống còn non-admin chỉ thấy phạm vi mình.
+- Quyết định: `RolesGuard` cấu hình `onDeny` hai nhánh theo trục keystone "thấy-được↔403 / không-thấy↔404":
+  - `hide` → 404 `RESOURCE_NOT_FOUND` (code có sẵn). Cho surface non-admin KHÔNG được thấy tồn tại — `/users`,`/teams` admin-only.
+  - `forbid` → 403 + **code mới `FORBIDDEN`**. Cho resource người gọi THẤY ĐƯỢC nhưng sai vai trò — member gọi `/stats` (đã thấy nhóm mình qua `/tasks`, `/teams/:id/members`).
+- Lý do: split này giữ đúng keystone — 403 ở `/stats` không lộ thêm gì (member đã thấy nhóm), 404 ở `/users`,`/teams` giấu trọn surface admin. Thêm một code 403 chung vào hợp đồng = sửa registry → đã hỏi & người duyệt qua plan-mode AskUserQuestion (Luật số 0). docs/06 §7.3 đông cứng nên agent KHÔNG sửa tại chỗ; entry này giữ chỗ tới khi `FORBIDDEN` go-live (Bước 6) thì người đưa vào §7.3. (Cân nhắc đổi tên rõ hơn — `INSUFFICIENT_ROLE`/`FORBIDDEN_ROLE` — TRƯỚC khi khoá vào registry + FE.)
+
+---
+
 ## Cách thêm entry mới
 
-Mỗi khi `/check-spine` hoặc plan-mode review gặp một chỗ spine để ngỏ và bạn duyệt một giá trị cụ thể, thêm entry vào đây **trước khi commit** — đừng để trôi vào chỉ commit message. Nếu entry đó có ngày hết hạn tự nhiên (một module sau sẽ phải xử lý), ghi rõ "đóng ở Bước N" và **đặt một dòng nhắc trong `CLAUDE.md`** ở bước đó nếu rủi ro bị quên là cao.
+Mỗi khi `/check-spine` hoặc plan-mode review gặp một chỗ spine để ngỏ và bạn duyệt một giá trị cụ thể, thêm entry vào đây **trước khi commit** — đừng để trôi vào chỉ commit message. Gắn `Loại`:
+- **phụ-lục-vĩnh-viễn** nếu hợp đồng im lặng (ở đây mãi).
+- **chờ-bổ-sung-spine** nếu là phần FE-observable (code/status/field) — ghi rõ "→ docs/06 §X, Bước N", và khi go-live thì người duyệt amendment vào docs/06 rồi đóng entry. Nếu rủi ro quên cao, **đặt một dòng nhắc trong `CLAUDE.md`** ở bước đó.
