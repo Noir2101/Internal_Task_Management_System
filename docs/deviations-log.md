@@ -87,6 +87,29 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ---
 
+### Tasks — status/body khi mutation thành công (Bước 4)
+- Loại: **chờ-bổ-sung-spine** → docs/06 §8.2/§10, Bước 4 (đã GO-LIVE — người duyệt nên thêm một dòng vào §8/§10 xác nhận body từng endpoint, rồi đóng entry)
+- Trạng thái: mở
+- Vị trí: src/tasks/interface/tasks.controller.ts (POST create · PATCH edit/progress/assignee · DELETE remove)
+- Hợp đồng nói gì: §10 liệt kê 201/200/204 và luật "200 kèm body cho trạng thái mới · 204 cho thao tác không cần thân"; §8.2 định nghĩa shape `TaskResponse`. Nhưng KHÔNG nói tường minh mỗi endpoint mutation trả status/body nào.
+- Quyết định: `POST /tasks` → **201 + TaskResponse**; `PATCH /:id`, `/:id/progress`, `/:id/assignee` → **200 + TaskResponse** (đã projection, gồm cờ `overdue` tính lại cùng `now`); `DELETE /:id` → **204** (không body, GET sau đó 404).
+- Lý do: suy thẳng từ luật §10 (tạo→201 · cần trạng thái mới→200+body · xoá→204) + projection §8.2 — FE nhận task tươi, không phải refetch. Duyệt qua plan-mode AskUserQuestion (Luật số 0).
+
+---
+
+### Tasks — reuse code §7.3 cho ca authz hợp đồng không liệt kê (Bước 4)
+- Loại: phụ-lục-vĩnh-viễn (KHÔNG đẻ code mới — chỉ tái dùng code có sẵn trong registry §7.3 cho call-site mới)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/tasks/application/reassign-task.usecase.ts:39,50 · src/tasks/application/create-task.usecase.ts:43,52
+- Hợp đồng nói gì: §3.1 reassign leader-only; §8.1 target reassign phải "thuộc nhóm và đang hoạt động"; §2 POST chỉ leader/member. Nhưng §7.3 KHÔNG có code riêng cho "member gọi reassign", "target inactive", hay "admin gọi POST".
+- Quyết định (đều record-level, assert SAU scoped-load nên cross-team vẫn 404 đúng keystone — KHÔNG dùng `RolesGuard` ở rìa cho tasks):
+  - member (in-team) gọi `PATCH /:id/assignee` → 403 `TASK_MEMBER_SELF_ASSIGN_ONLY` (khớp §7.4 "member giao cho người khác"). KHÔNG dùng `FORBIDDEN` (đó là code role-ở-rìa của RolesGuard).
+  - reassign target ngoài-nhóm HOẶC inactive → 403 `TASK_ASSIGNEE_NOT_IN_TEAM` (gộp 2 ca: "không phải assignee hợp lệ đang hoạt động trong nhóm").
+  - admin (teamId null) gọi `POST /tasks` → 403 `TASK_ASSIGNEE_NOT_IN_TEAM` (admin ngoài cây tổ chức, không assignee in-team → tự bị chặn, khớp §3.2).
+- Lý do: tránh đẻ code mới (Luật số 0) — mọi ca map khít vào code có sẵn. Duyệt qua plan-mode AskUserQuestion + plan review.
+
+---
+
 ## Cách thêm entry mới
 
 Mỗi khi `/check-spine` hoặc plan-mode review gặp một chỗ spine để ngỏ và bạn duyệt một giá trị cụ thể, thêm entry vào đây **trước khi commit** — đừng để trôi vào chỉ commit message. Gắn `Loại`:

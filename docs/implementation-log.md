@@ -28,6 +28,14 @@ Quy ước mỗi entry:
 
 ---
 
+## [Bước 4] Tách 2 token port (TaskWritePort / TaskQueryPort) thay vì 1 `TASK_REPOSITORY` — 2026-06-29
+- Triệu chứng: (không phải bug) snippet wiring ở `src/tasks/CLAUDE.md` ghi `{ provide: TASK_REPOSITORY, useClass: PrismaTaskRepository }` (1 token), nhưng cùng file đòi ISP "Stats chỉ thấy port đọc".
+- Nguyên nhân gốc / quyết định: 1 token không cấp được cho consumer (Bước 6 Stats) một view chỉ-đọc qua DI. Tách 2 token `TASK_WRITE_PORT` + `TASK_QUERY_PORT`, CẢ hai do `PrismaTaskRepository` hiện thực, bind qua `useExisting` (một instance dùng chung). Module chỉ `exports: [TASK_QUERY_PORT]` → Stats không với tới được port ghi.
+- Sửa: src/tasks/tasks.module.ts (providers + exports) · src/tasks/application/ports/task-{write,query}.port.ts.
+- Verify: build/lint/test xanh (25/25) + HTTP verify 31/31. Gotcha kèm: type port inject trong constructor có `@Inject` phải dùng `import type` (isolatedModules + emitDecoratorMetadata) — nếu không, TS1272.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra
