@@ -47,7 +47,7 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ### `POST /auth/refresh` không chặn user `isActive=false` (Bước 2)
 - Loại: phụ-lục-vĩnh-viễn (không đẻ code FE-observable; chỉ là quyết định KHÔNG thêm nhánh)
-- Trạng thái: mở (đóng ở Bước 5 — luồng deactivate thu hồi refresh token của user)
+- Trạng thái: **đã đóng** (đóng ở Bước 5, 2026-06-30 — `POST /users/:id/deactivate` revoke MỌI refresh token sống của user trong cùng `$transaction` với `isActive=false`. Verify tay: login member → refresh OK → deactivate → refresh lại bằng cookie đã rotate → 401 SESSION_EXPIRED. Điểm enforce đúng là deactivate, không phải nhánh isActive ở refresh — staleness ≤ access TTL giữ nguyên §6.4.)
 - Vị trí: src/auth/auth.service.ts:110
 - Hợp đồng nói gì: §6.2 chỉ liệt kê 200 + SESSION_EXPIRED cho refresh; im lặng về isActive.
 - Quyết định: refresh KHÔNG kiểm isActive; chỉ map lỗi token → SESSION_EXPIRED.
@@ -107,6 +107,56 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
   - reassign target ngoài-nhóm HOẶC inactive → 403 `TASK_ASSIGNEE_NOT_IN_TEAM` (gộp 2 ca: "không phải assignee hợp lệ đang hoạt động trong nhóm").
   - admin (teamId null) gọi `POST /tasks` → 403 `TASK_ASSIGNEE_NOT_IN_TEAM` (admin ngoài cây tổ chức, không assignee in-team → tự bị chặn, khớp §3.2).
 - Lý do: tránh đẻ code mới (Luật số 0) — mọi ca map khít vào code có sẵn. Duyệt qua plan-mode AskUserQuestion + plan review.
+
+---
+
+### Users/Teams — status/body + projection shape khi spine im lặng (Bước 5)
+- Loại: **chờ-bổ-sung-spine** → docs/06 §8.2/§10, Bước 5 (đã GO-LIVE — người duyệt thêm dòng xác nhận body từng endpoint + định nghĩa Team projection/roster vào §8.2/§10, rồi đóng entry)
+- Trạng thái: mở
+- Vị trí: src/users/users.controller.ts · src/teams/teams.controller.ts · src/users/dto/user.response.ts · src/teams/dto/team.response.ts
+- Hợp đồng nói gì: §10 cho luật 201/200/204 nhưng KHÔNG nói tường minh status/body từng endpoint Users/Teams; §8.2 định nghĩa UserResponse (7 field) nhưng KHÔNG định nghĩa Team projection hay shape roster.
+- Quyết định: POST /users,/teams → **201 + Response**; PATCH /users,/teams → **200 + Response**; PUT /teams/:id/leader → **200 + TeamResponse**; deactivate → **200 {user: UserResponse đầy đủ, orphanedTaskCount}**; reactivate → **200 {user: UserResponse đầy đủ}**. **TeamResponse = {id,name,createdAt}** (mirror UserResponse, bỏ updatedAt); **roster GET /teams/:id/members = [{id,name}]** (brief như owner/assignee/stats).
+- Lý do: suy thẳng luật §10 (tạo→201 · cần-trạng-thái-mới→200+body) + tiền lệ Bước 4; full UserResponse cho deactivate/reactivate vì §9.3 ví dụ {id,isActive} chỉ minh hoạ; Team không có cột leader nên PUT leader trả chính TeamResponse (leader mới xem qua roster). Duyệt qua plan-mode AskUserQuestion (Luật số 0).
+
+---
+
+### Users/Teams — default sort + phân trang khi spine im lặng (Bước 5)
+- Loại: **chờ-bổ-sung-spine** → docs/06 §9.2/§4.2, Bước 5
+- Trạng thái: mở
+- Vị trí: src/users/users.service.ts (list) · src/teams/teams.service.ts (list)
+- Hợp đồng nói gì: Luật số 0 nêu ĐÍCH DANH "default sort GET /users" còn để ngỏ; §9.2 nói /users "có phân trang" nhưng IM LẶNG shape meta + IM LẶNG phân trang cho /teams.
+- Quyết định: default sort **createdAt DESC, id DESC** cho cả /users & /teams (mirror Tasks §4.1, trang tất định); GET /users dùng meta **{page,limit,total,totalPages}** (như §4.2; limit default 20 trần 100; includeInactive default false → mặc định loại inactive); GET /teams trả **mảng thường** (không phân trang — §9.2 chỉ đòi cho /users, nhóm ít).
+- Lý do: một convention sort duy nhất toàn API; không over-paginate danh sách nhóm nhỏ. Duyệt qua AskUserQuestion.
+
+---
+
+### `orphanedTaskCount` đếm chưa-DONE, non-scoped (Bước 5)
+- Loại: **chờ-bổ-sung-spine** → docs/06 §9.3, Bước 5
+- Trạng thái: mở
+- Vị trí: src/tasks/infrastructure/prisma-task.repository.ts (countByAssignee) · src/users/users.service.ts (deactivate)
+- Hợp đồng nói gì: §9.3 trả `orphanedTaskCount` ("task treo") nhưng IM LẶNG đếm tập nào (mọi task non-deleted hay chỉ chưa-DONE) và scope.
+- Quyết định: đếm **chỉ chưa-DONE** (TODO+IN_PROGRESS), non-deleted, **non-scoped** theo assigneeId của user bị deactivate (đường mới `TaskQueryPort.countByAssignee` — admin không nhóm nên không đi qua scoped-load).
+- Lý do: "task treo" = việc còn cần leader reassign; DONE không cần giao lại. Non-scoped vì đếm chéo theo assigneeId. Verify tay: deactivate beB → count=2 (loại 1 DONE + 1 đã soft-delete). Duyệt qua AskUserQuestion.
+
+---
+
+### Password policy POST /users = MinLength(8) (Bước 5)
+- Loại: phụ-lục-vĩnh-viễn (formal validation; docs không đặt rule cụ thể)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/users/dto/create-user.dto.ts
+- Hợp đồng nói gì: §8.1 "password theo chính sách", §9.2 "theo FR-AUTH-01" — nhưng FR-AUTH-01/SEC-05 chỉ nói "admin đặt mật khẩu tạm" / "validate độ dài" CHUNG CHUNG, KHÔNG đặt rule cụ thể.
+- Quyết định: **MinLength(8)**, KHÔNG đòi độ phức tạp. Sai → 400 VALIDATION_FAILED + details[].
+- Lý do: mật khẩu tạm do admin đặt; argon2 lo phần hashing; tránh over-engineer rule độ phức tạp. Duyệt qua AskUserQuestion (Luật số 0 — docs im lặng → hỏi, không tự đặt rule).
+
+---
+
+### Edge im lặng Users — bogus teamId → 404, idempotent deactivate/reactivate (Bước 5)
+- Loại: phụ-lục-vĩnh-viễn (reuse code có sẵn trong registry, KHÔNG đẻ code mới)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/users/users.service.ts (create, deactivate, reactivate)
+- Hợp đồng nói gì: §9 không nói ca POST /users với `teamId` trỏ team không tồn tại, hay deactivate/reactivate lặp lại.
+- Quyết định: POST /users `teamId` không tồn tại → pre-check → **404 RESOURCE_NOT_FOUND** (admin thấy mọi team ⇒ thiếu = thật sự không có). deactivate user đã inactive / reactivate user đang active → **idempotent** (lật lại trạng thái, không lỗi).
+- Lý do: dùng code registry có sẵn cho edge admin-only ít gặp (P2003 FK safety-net để Bước 7); idempotent an toàn cho thao tác đảo-được. Duyệt qua plan review.
 
 ---
 

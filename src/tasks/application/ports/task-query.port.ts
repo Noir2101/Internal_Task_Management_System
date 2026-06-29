@@ -31,4 +31,11 @@ export interface ListTasksResult {
 export interface TaskQueryPort {
   findByIdScoped(id: string, scopeTeamId: string | null): Promise<Task | null>;
   list(query: ListTasksQuery): Promise<ListTasksResult>;
+  /**
+   * Đếm task treo (chưa-DONE, non-deleted) gán cho một assignee — KHÔNG scoped (đếm chéo nhóm theo
+   * assigneeId). Khác `findByIdScoped`/`list` (đã scoped theo nhóm): đây là read đặc quyền, chỉ luồng
+   * admin `deactivate` (Bước 5) dùng để báo `orphanedTaskCount` (docs/06 §9.3). Admin gọi deactivate
+   * không có nhóm nên không thể đi qua scoped-load — cần đường đếm thẳng theo assigneeId.
+   */
+  countByAssignee(assigneeId: string): Promise<number>;
 }
