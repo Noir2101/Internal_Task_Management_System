@@ -36,6 +36,17 @@ Quy ước mỗi entry:
 
 ---
 
+## [Bước 5] Users tiêu thụ artifact Tasks (deep) qua port đọc + Notifier — 2026-06-30
+- Triệu chứng: (không phải bug) luồng `deactivate` cần đếm task treo + báo leader, nhưng `TaskQueryPort` chỉ có `findByIdScoped`/`list` (đều scoped) và `Notifier` chỉ có `notifyReassigned`; `TasksModule` chỉ export `TASK_QUERY_PORT`.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - Thêm `TaskQueryPort.countByAssignee(assigneeId)` **non-scoped** (đếm chéo nhóm theo assigneeId, chưa-DONE + non-deleted) — admin deactivate KHÔNG có nhóm nên không thể đi qua scoped-load; tách rõ khỏi `findByIdScoped`/`list` (scoped) làm read đặc quyền.
+  - Mở rộng `Notifier` thêm `notifyTasksOrphaned` (NoopNotifier no-op, seam); `TasksModule` export thêm `NOTIFIER`; `UsersModule` import `TasksModule`, inject cả hai. Chiều phụ thuộc Users→Tasks (build-plan §1) — Tasks/Stats KHÔNG phụ thuộc ngược Users.
+  - Notifier phát **SAU commit** `$transaction` (tái dùng bài học Bước 2: side-effect cần-commit không đặt cùng transaction đường-ném-lỗi). Leader-swap: demote leader cũ → MEMBER **TRƯỚC** rồi promote (giữ ≤1 LEADER/team — không vỡ partial-unique `user_one_leader_per_team`; lúc promote không còn LEADER khác).
+- Phát hiện: `LAST_ADMIN` (đếm admin-active khác target == 0) thực tế **bị che bởi `CANNOT_DISABLE_SELF`** — endpoint admin-only ⇒ caller luôn là admin-active; caller≠target ⇒ `otherActiveAdmins≥1` (chính caller), caller==target ⇒ self bắt trước. Giữ guard làm phòng thủ (registry §7.3 liệt kê `LAST_ADMIN`) nhưng không reachable qua hợp đồng hiện tại — không phải bug, là hệ quả thứ-tự-guard self→leader→last-admin.
+- Verify: build/lint/test xanh (25/25) + HTTP verify tay 44/44 (gồm: refresh sau deactivate → 401 SESSION_EXPIRED; swap atomic demote/promote; orphanedTaskCount=2 loại DONE+soft-deleted; mass-assignment PATCH role → 400). Gotcha (đã biết từ Bước 4): type port inject `@Inject` phải `import type` — đã áp dụng ở users.service.ts.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra

@@ -34,6 +34,8 @@ import { TasksController } from './interface/tasks.controller';
     ReassignTask,
     DeleteTask,
   ],
-  exports: [TASK_QUERY_PORT],
+  // TASK_QUERY_PORT: Stats (Bước 6) đọc read-model + Users (Bước 5) đếm task treo (countByAssignee).
+  // NOTIFIER: Users (Bước 5) phát notifyTasksOrphaned khi deactivate — tiêu thụ port của Tasks.
+  exports: [TASK_QUERY_PORT, NOTIFIER],
 })
 export class TasksModule {}

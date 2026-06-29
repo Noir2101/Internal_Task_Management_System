@@ -11,4 +11,8 @@ export class NoopNotifier implements Notifier {
   notifyReassigned(): Promise<void> {
     return Promise.resolve();
   }
+
+  notifyTasksOrphaned(): Promise<void> {
+    return Promise.resolve();
+  }
 }

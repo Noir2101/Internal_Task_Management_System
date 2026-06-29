@@ -123,6 +123,14 @@ export class PrismaTaskRepository implements TaskQueryPort, TaskWritePort {
     });
   }
 
+  async countByAssignee(assigneeId: string): Promise<number> {
+    // KHÔNG scoped (không lọc theo nhóm) — đếm thẳng theo assigneeId task treo (chưa-DONE, non-deleted).
+    // Dùng bởi luồng admin deactivate (Bước 5) cho `orphanedTaskCount` (docs/06 §9.3).
+    return this.prisma.task.count({
+      where: { assigneeId, deletedAt: null, progress: { not: 'DONE' } },
+    });
+  }
+
   async isTeamMember(
     userId: string,
     teamId: string,
