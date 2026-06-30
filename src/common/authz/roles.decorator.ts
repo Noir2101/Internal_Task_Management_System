@@ -8,7 +8,7 @@ export const ROLES_KEY = 'authz:roles';
  * - `hide`   → 404 RESOURCE_NOT_FOUND. Cho surface mà người gọi KHÔNG được thấy tồn tại
  *              (vd non-admin gọi `/users`,`/teams` admin-only).
  * - `forbid` → 403 + `code`. Cho resource người gọi THẤY ĐƯỢC nhưng sai vai trò
- *              (vd member gọi `/stats` leader-only → `FORBIDDEN`).
+ *              (vd member/admin gọi `/stats` leader-only → `INSUFFICIENT_ROLE`).
  */
 export type DenyMode = { kind: 'hide' } | { kind: 'forbid'; code: string };
 
@@ -20,7 +20,7 @@ export interface RolesMeta {
 /**
  * Guard vai trò ở rìa HTTP: "role này có được gọi endpoint không". Đọc bởi `RolesGuard`.
  * `onDeny` mặc định `hide` (404) — khớp tinh thần keystone giấu tồn tại; endpoint nào muốn lộ 403
- * (vd `/stats`) truyền `{ kind:'forbid', code:'FORBIDDEN' }`.
+ * (vd `/stats` leader-only) truyền `{ kind:'forbid', code:'INSUFFICIENT_ROLE' }`.
  *
  * KHÔNG mang record-level (one-law-per-endpoint của Tasks ở Bước 4) — đây chỉ là guard role.
  */

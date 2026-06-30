@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { StatsModule } from './stats/stats.module';
 import { TasksModule } from './tasks/tasks.module';
 import { TeamsModule } from './teams/teams.module';
 import { UsersModule } from './users/users.module';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module';
     TasksModule,
     UsersModule,
     TeamsModule,
+    StatsModule,
   ],
 })
 export class AppModule {}
