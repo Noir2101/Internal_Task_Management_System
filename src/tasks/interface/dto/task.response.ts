@@ -5,11 +5,11 @@ import { project } from '../../../common/projection';
 
 /** owner/assignee — projection lồng CHỈ {id,name} (docs/06 §8.2), không nhả toàn bộ user. */
 class UserBrief {
-  @ApiProperty()
+  @ApiProperty({ example: 'ckx0owner1a2b3c4d5e6f7g8h' })
   @Expose()
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Bích' })
   @Expose()
   name: string;
 }
@@ -21,19 +21,23 @@ class UserBrief {
  * Date đi qua nguyên dạng → Nest serialize JSON thành ISO-8601 UTC (docs/06 §1).
  */
 export class TaskResponse {
-  @ApiProperty()
+  @ApiProperty({ example: 'ckx0task01a2b3c4d5e6f7g8h' })
   @Expose()
   id: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Migration prod' })
   @Expose()
   title: string;
 
-  @ApiProperty({ nullable: true, type: String })
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    example: 'Chạy migration trên DB production',
+  })
   @Expose()
   description: string | null;
 
-  @ApiProperty({ enum: Progress })
+  @ApiProperty({ enum: Progress, example: Progress.IN_PROGRESS })
   @Expose()
   progress: Progress;
 
@@ -41,6 +45,7 @@ export class TaskResponse {
     nullable: true,
     type: String,
     description: 'ISO-8601 UTC, có thể null',
+    example: '2026-06-22T17:00:00.000Z',
   })
   @Expose()
   deadline: string | null;
@@ -53,21 +58,27 @@ export class TaskResponse {
   @Expose()
   overdue: boolean;
 
-  @ApiProperty({ type: UserBrief })
+  @ApiProperty({
+    type: UserBrief,
+    example: { id: 'ckx0owner1a2b3c4d5e6f7g8h', name: 'Bích' },
+  })
   @Expose()
   @Type(() => UserBrief)
   owner: UserBrief;
 
-  @ApiProperty({ type: UserBrief })
+  @ApiProperty({
+    type: UserBrief,
+    example: { id: 'ckx0assignee2b3c4d5e6f7g8', name: 'Bảo' },
+  })
   @Expose()
   @Type(() => UserBrief)
   assignee: UserBrief;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2026-06-18T09:00:00.000Z' })
   @Expose()
   createdAt: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2026-06-20T14:30:00.000Z' })
   @Expose()
   updatedAt: string;
 }

@@ -44,6 +44,17 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## API docs (Swagger)
+
+Interactive OpenAPI docs are served at **`/api/v1/docs`** (generated from DTO decorators —
+contract source: `docs/06-api-contract.md`). Use the **Authorize** button to paste an access token
+and call endpoints; the refresh-token cookie is `httpOnly` so the refresh flow can't be exercised
+from Swagger (test it via curl or the frontend).
+
+> **Note (demo choice).** Swagger is left **open** here so reviewers can explore the API. In a real
+> production deployment this should be gated behind an environment flag — open API docs are not a
+> safe default for prod (docs/06 §11 "cổng prod").
+
 ## Run tests
 
 ```bash
