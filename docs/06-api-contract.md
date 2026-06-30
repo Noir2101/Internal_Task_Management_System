@@ -448,6 +448,7 @@ Một luật duy nhất: response là một phép chiếu, không phải model. 
 - **Không bao giờ serialize.** Gồm `passwordHash`, `tokenHash`, mọi field của RefreshToken, và `Task.deletedAt`.
 - **Task.** Hình dạng là `{ id, title, description, progress, deadline, overdue, owner, assignee, createdAt, updatedAt }`. Field `overdue` là computed. Hai field `owner` và `assignee` là projection lồng, chỉ gồm `{ id, name }`, không nhả toàn bộ user.
 - **User.** Hình dạng là `{ id, email, name, role, teamId, isActive, createdAt }`. Field `teamId` của chính người đó không nhạy cảm nên lộ được.
+- **Team.** *(bổ sung GĐ7-recon, xem `docs/deviations-log.md` — Bước 5)* Hình dạng là `{ id, name, createdAt }` (mirror User, bỏ `updatedAt`). Roster `GET /teams/:id/members` là `[{ id, name }]` — brief như `owner`/`assignee`, không nhả email/role/isActive.
 
 ### 8.3. Quy ước casing và format
 
@@ -484,6 +485,8 @@ Một endpoint roster, không phải admin-only, phạm vi do server suy ra. Nó
 
 Validation lúc tạo user map CHECK "admin thì không có nhóm, leader và member thì phải có nhóm" lên DTO, cùng kiểu với rule title không rỗng. Nếu `role` là `ADMIN` thì teamId phải vắng. Nếu `role` là `LEADER` hoặc `MEMBER` thì teamId bắt buộc. Sai thì trả 400. Tạo thẳng một user `role=LEADER` chỉ được khi nhóm chưa có leader. Nhóm đã có leader thì trả 409 `LEADER_ALREADY_EXISTS`, và buộc dùng `PUT /teams/:id/leader`.
 
+> **[Amendment GĐ7-recon — 2026-07-01]** *(bổ sung GĐ7-recon, xem `docs/deviations-log.md` — Bước 5)* Sort và phân trang mà §9.2 để ngỏ: `GET /users` sort `createdAt DESC, id DESC` (tất định như §4.1), trả `meta { page, limit, total, totalPages }` đúng hình dạng §4.2 (`limit` mặc định 20, trần 100; `includeInactive` mặc định false → mặc định loại bản ghi inactive). `GET /teams` dùng cùng sort nhưng trả **mảng thường, không phân trang** (§9.2 chỉ đòi phân trang cho `/users`; số nhóm ít).
+
 ### 9.3. Ba endpoint có máu
 
 **`PUT /teams/:id/leader` gộp ba yêu cầu vào một.** Tính chất "đúng một leader" thuộc về team, nên một thao tác PUT đặt giá trị singleton đọc đúng nghĩa hơn là một PATCH đổi role của user. Body là `{ userId }`, và userId phải là một member đang hoạt động của nhóm. Server làm atomic, gồm demote leader cũ thành MEMBER và promote người mới, theo schema mục 4.4.
@@ -501,6 +504,8 @@ Cái đẹp của endpoint này là nó cũng là lời giải cho việc chặn
   "orphanedTaskCount": 3       // chính là "báo leader N task treo"
 }
 ```
+
+> **[Amendment GĐ7-recon — 2026-07-01]** *(bổ sung GĐ7-recon, xem `docs/deviations-log.md` — Bước 5)* `orphanedTaskCount` đếm **chỉ task chưa-DONE** (`TODO` + `IN_PROGRESS`), non-deleted, theo `assigneeId` của user bị vô hiệu hoá (non-scoped — admin không có nhóm nên không đi qua scoped-load). Task `DONE` không tính vì không cần leader giao lại.
 
 Hai edge nên chặn để xứng production. Không cho admin vô hiệu hoá chính mình. Không cho vô hiệu hoá admin cuối cùng. Hai ca này trả 409 `CANNOT_DISABLE_SELF` và `LAST_ADMIN`. Việc này chống tự khoá hệ thống, và rất rẻ.
 
@@ -541,6 +546,10 @@ FR-USER-02 viết "gán nhóm và vai trò", và có thể bị đọc thành ad
 | `POST /auth/logout` | 204 | Không |
 
 Kỷ luật: 204 dành cho thao tác đổi trạng thái mà không cần trả thân, ví dụ xoá task và logout. 200 kèm body dành cho thao tác cần trả về trạng thái mới, ví dụ deactivate trả về số task treo. Quy ước này áp cho toàn surface.
+
+> **[Amendment GĐ7-recon — 2026-07-01]** *(bổ sung GĐ7-recon, xem `docs/deviations-log.md` — Bước 4 + Bước 5)* Status/body từng endpoint mutation mà §10 trước đây chỉ cho luật chung, không liệt kê đích danh — suy thẳng từ luật trên:
+> - **Tasks:** `POST /tasks` → 201 + `TaskResponse`; `PATCH /tasks/:id`, `/progress`, `/assignee` → 200 + `TaskResponse` (đã projection, gồm cờ `overdue` tính lại cùng `now`); `DELETE /tasks/:id` → 204.
+> - **Users/Teams:** `POST /users`, `POST /teams` → 201 + projection; `PATCH /users/:id`, `/teams/:id` → 200 + projection; `PUT /teams/:id/leader` → 200 + `TeamResponse` (Team không có cột leader → trả chính row team); `POST /users/:id/deactivate` → 200 `{ user: UserResponse đầy đủ, orphanedTaskCount }`; `POST /users/:id/reactivate` → 200 `{ user: UserResponse đầy đủ }`. (Ví dụ `{id,isActive}` ở §9.3 chỉ minh hoạ; body thật là UserResponse đầy đủ.)
 
 Bảng status tổng dưới đây khoá toàn bộ Giai đoạn 6. Đây là toàn bộ trục code mà frontend phải học.
 
