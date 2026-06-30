@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   LeaderNotTeamMemberException,
   TeamNameTakenException,
+  TeamNotEmptyException,
 } from './teams.exceptions';
 
 /**
@@ -72,6 +73,19 @@ export class TeamsService {
     });
     // Team không có cột leader (leadership derive từ User) → row team không đổi.
     return team;
+  }
+
+  /**
+   * Break-glass DELETE /teams/:id (§9.4). Hard-delete row Team (Team KHÔNG có tombstone) → 204.
+   * "Empty" = KHÔNG còn User nào trỏ teamId (đếm CẢ inactive — teamId bất biến §9.5 + FK Restrict
+   * chặn theo sự tồn tại row, không theo isActive). Còn member → 409 TEAM_NOT_EMPTY (pre-check là
+   * đường chính; P2003 từ filter Bước 7 đỡ ca đua). Log seam do BreakGlassInterceptor ghi ở rìa.
+   */
+  async remove(id: string): Promise<void> {
+    loadOr404(await this.prisma.team.findUnique({ where: { id } }));
+    const members = await this.prisma.user.count({ where: { teamId: id } });
+    if (members > 0) throw new TeamNotEmptyException();
+    await this.prisma.team.delete({ where: { id } });
   }
 
   /** Roster — member đang hoạt động của nhóm. Scope (nhóm khác → 404) kiểm ở controller theo teamId người gọi. */
