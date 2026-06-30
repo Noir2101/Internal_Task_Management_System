@@ -381,7 +381,10 @@ Bảng này gom mọi `code` rải rác trong các mục trên về một chỗ.
 | auth | `ACCOUNT_DISABLED` | 403 |
 | task | `NOT_TASK_OWNER`, `NOT_TASK_ASSIGNEE`, `TASK_ASSIGNEE_NOT_IN_TEAM`, `TASK_MEMBER_SELF_ASSIGN_ONLY` | 403 |
 | task | `PAST_DEADLINE_CONFIRMATION_REQUIRED` | 400 |
+| authz (role ở rìa) | `INSUFFICIENT_ROLE` | 403 |
 | user và org | `EMAIL_TAKEN`, `TEAM_NAME_TAKEN`, `LEADER_REPLACEMENT_REQUIRED`, `LEADER_ALREADY_EXISTS`, `LEADER_NOT_TEAM_MEMBER`, `CANNOT_DISABLE_SELF`, `LAST_ADMIN`, `TEAM_NOT_EMPTY` | xem mục 7.4 |
+
+> **[Amendment GĐ7 Bước 6 — 2026-06-30]** Dòng `INSUFFICIENT_ROLE | 403` thêm khi `GET /stats` go-live (xem `docs/deviations-log.md` entry Bước 3). Đây là code role-deny Ở RÌA (`RolesGuard` nhánh `forbid`): người gọi THẤY ĐƯỢC resource/biết endpoint nhưng SAI vai trò — khác `NOT_TASK_OWNER`… (record-level). Hiện chỉ `/stats` (leader-only) dùng; member và admin gọi đều nhận code này. Tách bạch với nhánh `hide`→404 `RESOURCE_NOT_FOUND` (giấu tồn tại, vd `/users`,`/teams` admin-only).
 
 Mã 404 dùng code chung là `RESOURCE_NOT_FOUND`, không dùng một code riêng kiểu `TASK_NOT_FOUND_IN_TEAM`. Việc này giữ đúng keystone. Resource ngoài phạm vi thì người gọi không được biết nó là gì. Ngược lại, mã 403 được phép dùng code cụ thể. Vì người gọi đã thấy được resource cùng nhóm, nói rõ "bạn không phải owner" không lộ thêm gì.
 
@@ -546,7 +549,7 @@ Bảng status tổng dưới đây khoá toàn bộ Giai đoạn 6. Đây là to
 | 200, 201, 204 | OK, đã tạo, không có thân | không có |
 | 400 | Payload sai hoặc thiếu | `VALIDATION_FAILED`, `PAST_DEADLINE_CONFIRMATION_REQUIRED`, `LEADER_NOT_TEAM_MEMBER` |
 | 401 | Chưa xác thực | `INVALID_CREDENTIALS`, `TOKEN_EXPIRED`, `SESSION_EXPIRED` |
-| 403 | Thấy được nhưng không được phép | `NOT_TASK_OWNER`, `NOT_TASK_ASSIGNEE`, `TASK_ASSIGNEE_NOT_IN_TEAM`, `ACCOUNT_DISABLED` |
+| 403 | Thấy được nhưng không được phép | `NOT_TASK_OWNER`, `NOT_TASK_ASSIGNEE`, `TASK_ASSIGNEE_NOT_IN_TEAM`, `ACCOUNT_DISABLED`, `INSUFFICIENT_ROLE` |
 | 404 | Ngoài phạm vi hoặc không tồn tại, dùng code chung | `RESOURCE_NOT_FOUND` |
 | 409 | Xung đột trạng thái | `EMAIL_TAKEN`, `TEAM_NAME_TAKEN`, `LEADER_REPLACEMENT_REQUIRED`, `LEADER_ALREADY_EXISTS`, `TEAM_NOT_EMPTY`, `CANNOT_DISABLE_SELF`, `LAST_ADMIN` |
 | 429 | Bị throttle | `RATE_LIMITED` |

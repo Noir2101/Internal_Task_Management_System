@@ -75,15 +75,15 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ---
 
-### Code 403 `FORBIDDEN` cho role-deny ở rìa — split theo keystone (Bước 3)
-- Loại: **chờ-bổ-sung-spine** → docs/06 §7.3, Bước 6 (khi `/stats` thật sự phát `FORBIDDEN`, người duyệt thêm dòng `FORBIDDEN | 403` vào registry rồi đóng entry này)
-- Trạng thái: mở (chưa call-site nào phát — `DenyMode` mới là convention; `/stats` leader-only là Bước 6, `/users`,`/teams` admin-only ở Bước 5 đi nhánh hide→404 nên KHÔNG đẻ code)
-- Vị trí: src/common/authz/roles.decorator.ts:13 (type `DenyMode`) + :23 (default code `FORBIDDEN`), src/common/authz/roles.guard.ts:42 (throw `ForbiddenError`)
+### Code 403 role-deny ở rìa — split theo keystone (Bước 3 · GO-LIVE Bước 6: `FORBIDDEN`→`INSUFFICIENT_ROLE`)
+- Loại: **chờ-bổ-sung-spine** → docs/06 §7.3, Bước 6 (đã GO-LIVE — người duyệt thêm dòng `INSUFFICIENT_ROLE | 403` (nhóm task/chung) vào registry §7.3 + ví dụ vào bảng §10, rồi đánh dấu entry này đã đóng)
+- Trạng thái: **đã đóng** (Bước 6, 2026-06-30 — `GET /stats` leader-only phát code thật; tên CHỐT `INSUFFICIENT_ROLE` (đổi từ `FORBIDDEN`, qua AskUserQuestion); người duyệt đã thêm dòng `INSUFFICIENT_ROLE | 403` vào docs/06 §7.3 + ví dụ §10 (amendment có-đánh-dấu). Verify tay: member→403, admin→403.)
+- Vị trí: src/stats/stats.controller.ts:31 (`@Roles(['LEADER'], {forbid, code:'INSUFFICIENT_ROLE'})`), src/common/authz/roles.guard.ts:42 (throw `ForbiddenError`), src/common/authz/roles.decorator.ts (convention `DenyMode` + ví dụ comment cập nhật `INSUFFICIENT_ROLE`)
 - Hợp đồng nói gì: registry §7.3 KHÔNG có code 403 chung cho "sai vai trò ở rìa" — chỉ có code record-level cụ thể (`NOT_TASK_OWNER`...). §5 lại nói `/stats` dùng 403; §3.3 nói admin có phạm vi toàn hệ thống còn non-admin chỉ thấy phạm vi mình.
 - Quyết định: `RolesGuard` cấu hình `onDeny` hai nhánh theo trục keystone "thấy-được↔403 / không-thấy↔404":
   - `hide` → 404 `RESOURCE_NOT_FOUND` (code có sẵn). Cho surface non-admin KHÔNG được thấy tồn tại — `/users`,`/teams` admin-only.
-  - `forbid` → 403 + **code mới `FORBIDDEN`**. Cho resource người gọi THẤY ĐƯỢC nhưng sai vai trò — member gọi `/stats` (đã thấy nhóm mình qua `/tasks`, `/teams/:id/members`).
-- Lý do: split này giữ đúng keystone — 403 ở `/stats` không lộ thêm gì (member đã thấy nhóm), 404 ở `/users`,`/teams` giấu trọn surface admin. Thêm một code 403 chung vào hợp đồng = sửa registry → đã hỏi & người duyệt qua plan-mode AskUserQuestion (Luật số 0). docs/06 §7.3 đông cứng nên agent KHÔNG sửa tại chỗ; entry này giữ chỗ tới khi `FORBIDDEN` go-live (Bước 6) thì người đưa vào §7.3. (Cân nhắc đổi tên rõ hơn — `INSUFFICIENT_ROLE`/`FORBIDDEN_ROLE` — TRƯỚC khi khoá vào registry + FE.)
+  - `forbid` → 403 + **code mới `INSUFFICIENT_ROLE`** (chốt Bước 6). Cho resource người gọi THẤY ĐƯỢC nhưng sai vai trò — member gọi `/stats` (đã thấy nhóm mình qua `/tasks`, `/teams/:id/members`); admin gọi `/stats` cũng 403 CÙNG code (xem entry "Stats — chỗ §5 im lặng (Bước 6)").
+- Lý do: split này giữ đúng keystone — 403 ở `/stats` không lộ thêm gì (member đã thấy nhóm), 404 ở `/users`,`/teams` giấu trọn surface admin. Thêm một code 403 chung vào hợp đồng = sửa registry → đã hỏi & người duyệt qua plan-mode AskUserQuestion (Luật số 0). docs/06 §7.3 đông cứng nên agent KHÔNG sửa tại chỗ; entry này giữ chỗ tới khi go-live (Bước 6) thì người đưa vào §7.3. Tên CHỐT `INSUFFICIENT_ROLE` (rõ hơn `FORBIDDEN`/`FORBIDDEN_ROLE`: nói rõ "thiếu vai trò" — khác record-level `NOT_TASK_OWNER`...) qua AskUserQuestion Bước 6, TRƯỚC khi khoá registry+FE.
 
 ---
 
@@ -157,6 +157,16 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 - Hợp đồng nói gì: §9 không nói ca POST /users với `teamId` trỏ team không tồn tại, hay deactivate/reactivate lặp lại.
 - Quyết định: POST /users `teamId` không tồn tại → pre-check → **404 RESOURCE_NOT_FOUND** (admin thấy mọi team ⇒ thiếu = thật sự không có). deactivate user đã inactive / reactivate user đang active → **idempotent** (lật lại trạng thái, không lỗi).
 - Lý do: dùng code registry có sẵn cho edge admin-only ít gặp (P2003 FK safety-net để Bước 7); idempotent an toàn cho thao tác đảo-được. Duyệt qua plan review.
+
+---
+
+### Stats — chỗ §5 im lặng: byAssignee sort + admin-deny + nhóm rỗng (Bước 6)
+- Loại: phụ-lục-vĩnh-viễn (sort + edge); admin-deny tái dùng code role-rìa `INSUFFICIENT_ROLE` (xem entry Bước 3 go-live — KHÔNG đẻ code mới)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/tasks/infrastructure/prisma-task.repository.ts (aggregate — sort `localeCompare`) · src/stats/stats.controller.ts (`@Roles(['LEADER'], forbid)`)
+- Hợp đồng nói gì: §5 định shape stats nhưng IM LẶNG: (a) sort mảng `byAssignee`; (b) admin (role≠leader, teamId null) gọi `/stats` ra code/status nào; (c) nhóm rỗng task / toàn member rảnh.
+- Quyết định: (a) `byAssignee` sort **name ASC** (khớp tiền lệ roster `GET /teams/:id/members` — cùng là liệt-kê-người-trong-nhóm); (b) admin → **403 `INSUFFICIENT_ROLE`** CÙNG code với member (một `RolesGuard([LEADER])` nhánh `forbid`; admin biết endpoint qua contract ⇒ 403 không lộ thêm; KHÔNG tách admin→404); (c) nhóm rỗng → **200** với byProgress toàn 0, byAssignee các dòng 0 (member rảnh vẫn hiện), total 0, overdue 0 (KHÔNG 404).
+- Lý do: một convention sort cho liệt-kê-người; admin-deny ở rìa role-guard (không scoped-load như /tasks) ⇒ 403 đúng "thấy-được↔403", giữ một guard không tách nhánh; stats luôn 200 cho leader (dashboard hợp lệ kể cả rỗng). Duyệt qua plan-mode AskUserQuestion (Luật số 0 — §5 im lặng → hỏi).
 
 ---
 

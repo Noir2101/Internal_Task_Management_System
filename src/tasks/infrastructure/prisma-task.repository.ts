@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Task } from '../domain/task.entity';
+import { Progress, Task, UserRef } from '../domain/task.entity';
 import {
+  AssigneeAggregate,
   ListTasksQuery,
   ListTasksResult,
+  TaskAggregate,
   TaskQueryPort,
 } from '../application/ports/task-query.port';
 import {
@@ -61,6 +63,114 @@ export class PrismaTaskRepository implements TaskQueryPort, TaskWritePort {
       this.prisma.task.count({ where }),
     ]);
     return { items: rows.map(toDomain), total };
+  }
+
+  /**
+   * Aggregate read-model cho Stats (docs/06 §5). Outer-join User×Task bằng groupBy + union TRONG
+   * adapter (đọc bảng User/Team trực tiếp — KHÔNG phụ thuộc module Users/Teams; Stats KHÔNG thấy Prisma).
+   * 3 bất biến OVERDUE ép bằng cấu trúc:
+   *   - `byProgress` khởi tạo đủ 3 key (0 nếu rảnh) — KHÔNG bucket OVERDUE thứ tư.
+   *   - `overdue` từ groupBy RIÊNG với `overduePredicate` (sibling) — không đếm trùng.
+   *   - team-level DERIVE từ per-assignee ⇒ `total = Σ byProgress = Σ byAssignee`; overdue ngoài total.
+   * overdue dùng CHUNG `now` (Clock) + ĐÚNG predicate với cờ/filter list.
+   */
+  async aggregate(scopeTeamId: string, now: Date): Promise<TaskAggregate> {
+    // scope = nhóm của assignee (suy ra) + non-deleted — ĐÚNG scoped-load của list/findByIdScoped.
+    const scopeWhere: Prisma.TaskWhereInput = {
+      deletedAt: null,
+      assignee: { is: { teamId: scopeTeamId } },
+    };
+    const overdueWhere: Prisma.TaskWhereInput = {
+      ...scopeWhere,
+      ...overduePredicate(now),
+    };
+
+    const [team, progressRows, overdueRows, activeMembers] = await Promise.all([
+      this.prisma.team.findUnique({
+        where: { id: scopeTeamId },
+        select: { name: true },
+      }),
+      this.prisma.task.groupBy({
+        by: ['assigneeId', 'progress'],
+        where: scopeWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.task.groupBy({
+        by: ['assigneeId'],
+        where: overdueWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.user.findMany({
+        where: { teamId: scopeTeamId, isActive: true },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    // byAssignee = HỢP(member đang hoạt động ∪ assignee còn task). Khởi tạo member active trước
+    // (rảnh → toàn 0); bổ sung assignee inactive còn task treo (có trong task nhưng không active).
+    const acc = new Map<string, AssigneeAggregate>();
+    const ensure = (assignee: UserRef): AssigneeAggregate => {
+      let row = acc.get(assignee.id);
+      if (!row) {
+        row = {
+          assignee,
+          byProgress: { TODO: 0, IN_PROGRESS: 0, DONE: 0 },
+          overdue: 0,
+        };
+        acc.set(assignee.id, row);
+      }
+      return row;
+    };
+    for (const m of activeMembers) ensure(m);
+
+    const extraIds = [
+      ...new Set(
+        progressRows.map((r) => r.assigneeId).filter((id) => !acc.has(id)),
+      ),
+    ];
+    if (extraIds.length) {
+      const extras = await this.prisma.user.findMany({
+        where: { id: { in: extraIds } },
+        select: { id: true, name: true },
+      });
+      for (const u of extras) ensure(u);
+    }
+
+    for (const r of progressRows) {
+      const row = acc.get(r.assigneeId);
+      if (row) row.byProgress[r.progress] += r._count._all;
+    }
+    for (const r of overdueRows) {
+      const row = acc.get(r.assigneeId);
+      if (row) row.overdue += r._count._all;
+    }
+
+    const byAssignee = [...acc.values()].sort((a, b) =>
+      a.assignee.name.localeCompare(b.assignee.name),
+    );
+
+    // Team-level DERIVE (reduce per-assignee) ⇒ total = Σ byProgress = Σ byAssignee, cấu trúc bảo chứng.
+    const byProgress: Record<Progress, number> = {
+      TODO: 0,
+      IN_PROGRESS: 0,
+      DONE: 0,
+    };
+    let overdue = 0;
+    for (const row of byAssignee) {
+      byProgress.TODO += row.byProgress.TODO;
+      byProgress.IN_PROGRESS += row.byProgress.IN_PROGRESS;
+      byProgress.DONE += row.byProgress.DONE;
+      overdue += row.overdue;
+    }
+    const total = byProgress.TODO + byProgress.IN_PROGRESS + byProgress.DONE;
+
+    return {
+      scope: { teamId: scopeTeamId, teamName: team?.name ?? '' },
+      total,
+      byProgress,
+      overdue,
+      byAssignee,
+    };
   }
 
   // ───────────── GHI (TaskWritePort) ─────────────
@@ -148,6 +258,15 @@ export class PrismaTaskRepository implements TaskQueryPort, TaskWritePort {
   }
 }
 
+/**
+ * Predicate OVERDUE = deadline < now AND progress != DONE (docs/06 §4 / DueStatus domain).
+ * NGUỒN DUY NHẤT cho cả filter `?overdue=true` (list) lẫn `aggregate` ⇒ hai chỗ không thể lệch
+ * predicate (deadline NULL & DONE-quá-hạn tự bị loại). Mốc `now` truyền vào từ Clock (cổng 3).
+ */
+function overduePredicate(now: Date): Prisma.TaskWhereInput {
+  return { deadline: { lt: now }, progress: { not: 'DONE' } };
+}
+
 /** WHERE cho list — filter AND nhau; overdue dùng `q.now` (cùng mốc với cờ — cổng 3). */
 function buildListWhere(q: ListTasksQuery): Prisma.TaskWhereInput {
   const and: Prisma.TaskWhereInput[] = [];
@@ -168,9 +287,7 @@ function buildListWhere(q: ListTasksQuery): Prisma.TaskWhereInput {
   }
 
   if (q.overdue === true) {
-    // OVERDUE = deadline < now AND progress != DONE.
-    and.push({ deadline: { lt: q.now } });
-    and.push({ progress: { not: 'DONE' } });
+    and.push(overduePredicate(q.now));
   } else if (q.overdue === false) {
     // NOT overdue = không deadline HOẶC chưa tới hạn HOẶC đã DONE.
     and.push({

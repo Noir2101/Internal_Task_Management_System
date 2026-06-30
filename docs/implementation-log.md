@@ -47,6 +47,19 @@ Quy ước mỗi entry:
 
 ---
 
+## [Bước 6] Stats tiêu thụ aggregate read-model — outer-join User×Task TRONG adapter Tasks — 2026-06-30
+- Triệu chứng: (không phải bug) Bước 4 HOÃN `TaskQueryPort.aggregate` tới đây; Bước 6 phải thiết kế shape (docs/06 §5) + hiện thực outer-join `byAssignee` mà KHÔNG cho `stats/` chạm Prisma (cổng 1) và KHÔNG kéo module Users/Teams vào.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - `aggregate(scopeTeamId, now)` là **một method trả full shape** `{scope,total,byProgress,overdue,byAssignee}`, hiện thực trong `PrismaTaskRepository` (adapter Tasks). Stats inject CHỈ `TASK_QUERY_PORT` + `CLOCK` — ISP, không thấy write port; `stats/` 0 import Prisma (cổng 1 ESLint).
+  - **Outer-join trong adapter, không N+1:** 2 `groupBy` (`[assigneeId,progress]` cho byProgress + `[assigneeId]` với `overduePredicate` cho overdue) ∪ `user.findMany(active members)` ∪ tra tên cho assignee inactive-còn-task (`id in extraIds`). Khởi tạo mỗi người `{TODO:0,IN_PROGRESS:0,DONE:0}` ⇒ member rảnh hiện 0; member inactive-còn-task-treo VẪN hiện (đóng kẽ "task rơi khỏi phân rã").
+  - **Team-level DERIVE bằng reduce per-assignee** (không query riêng) ⇒ cấu trúc bảo chứng `total = Σ byProgress = Σ byAssignee` và `team.overdue = Σ assignee.overdue` — một trong 3 bất biến OVERDUE đúng-by-construction, không nhờ kỷ luật.
+  - **Tách `overduePredicate(now)`** dùng CHUNG cho `buildListWhere` (filter `?overdue=true`) lẫn `aggregate` ⇒ predicate `deadline<now AND progress!=DONE` không thể lệch giữa list và stats; cùng mốc `now` từ Clock (cổng 3).
+  - **`teamName` đọc bảng Team TRONG adapter** (`prisma.team.findUnique`) — Tasks adapter vốn đã đọc bảng User cho assignee; đọc bảng Team là cùng pattern, KHÔNG phụ thuộc module Teams. Stats không thấy Prisma.
+  - Gotcha cổng 1: `stats/` cấm `@prisma/client` ⇒ controller dùng `@Roles(['LEADER'])` chuỗi literal thay `Role.LEADER` (vẫn type-check vì `Role = 'ADMIN'|'LEADER'|'MEMBER'`).
+- Verify: build/lint/test xanh (28/28, +3 projection spec khoá bất biến 3-key) + HTTP verify tay: BE leader total=6 byProgress{3,2,1} overdue=2 (loại DONE-quá-hạn) Σbyassignee=6; deactivate beB → vẫn hiện trong byAssignee; FE leader scope tách (teamName=Frontend); member+admin → 403 INSUFFICIENT_ROLE.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra
