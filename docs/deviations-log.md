@@ -89,7 +89,7 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ### Tasks — status/body khi mutation thành công (Bước 4)
 - Loại: **chờ-bổ-sung-spine** → docs/06 §8.2/§10, Bước 4 (đã GO-LIVE — người duyệt nên thêm một dòng vào §8/§10 xác nhận body từng endpoint, rồi đóng entry)
-- Trạng thái: mở
+- Trạng thái: **đã đóng** (Bước 7 recon, 2026-07-01 — promoted vào docs/06 §10 amendment "status/body từng endpoint mutation")
 - Vị trí: src/tasks/interface/tasks.controller.ts (POST create · PATCH edit/progress/assignee · DELETE remove)
 - Hợp đồng nói gì: §10 liệt kê 201/200/204 và luật "200 kèm body cho trạng thái mới · 204 cho thao tác không cần thân"; §8.2 định nghĩa shape `TaskResponse`. Nhưng KHÔNG nói tường minh mỗi endpoint mutation trả status/body nào.
 - Quyết định: `POST /tasks` → **201 + TaskResponse**; `PATCH /:id`, `/:id/progress`, `/:id/assignee` → **200 + TaskResponse** (đã projection, gồm cờ `overdue` tính lại cùng `now`); `DELETE /:id` → **204** (không body, GET sau đó 404).
@@ -112,7 +112,7 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ### Users/Teams — status/body + projection shape khi spine im lặng (Bước 5)
 - Loại: **chờ-bổ-sung-spine** → docs/06 §8.2/§10, Bước 5 (đã GO-LIVE — người duyệt thêm dòng xác nhận body từng endpoint + định nghĩa Team projection/roster vào §8.2/§10, rồi đóng entry)
-- Trạng thái: mở
+- Trạng thái: **đã đóng** (Bước 7 recon, 2026-07-01 — promoted vào docs/06 §8.2 (Team projection + roster) + §10 amendment (status/body Users/Teams))
 - Vị trí: src/users/users.controller.ts · src/teams/teams.controller.ts · src/users/dto/user.response.ts · src/teams/dto/team.response.ts
 - Hợp đồng nói gì: §10 cho luật 201/200/204 nhưng KHÔNG nói tường minh status/body từng endpoint Users/Teams; §8.2 định nghĩa UserResponse (7 field) nhưng KHÔNG định nghĩa Team projection hay shape roster.
 - Quyết định: POST /users,/teams → **201 + Response**; PATCH /users,/teams → **200 + Response**; PUT /teams/:id/leader → **200 + TeamResponse**; deactivate → **200 {user: UserResponse đầy đủ, orphanedTaskCount}**; reactivate → **200 {user: UserResponse đầy đủ}**. **TeamResponse = {id,name,createdAt}** (mirror UserResponse, bỏ updatedAt); **roster GET /teams/:id/members = [{id,name}]** (brief như owner/assignee/stats).
@@ -122,7 +122,7 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ### Users/Teams — default sort + phân trang khi spine im lặng (Bước 5)
 - Loại: **chờ-bổ-sung-spine** → docs/06 §9.2/§4.2, Bước 5
-- Trạng thái: mở
+- Trạng thái: **đã đóng** (Bước 7 recon, 2026-07-01 — promoted vào docs/06 §9.2 amendment "sort + pagination meta /users & /teams")
 - Vị trí: src/users/users.service.ts (list) · src/teams/teams.service.ts (list)
 - Hợp đồng nói gì: Luật số 0 nêu ĐÍCH DANH "default sort GET /users" còn để ngỏ; §9.2 nói /users "có phân trang" nhưng IM LẶNG shape meta + IM LẶNG phân trang cho /teams.
 - Quyết định: default sort **createdAt DESC, id DESC** cho cả /users & /teams (mirror Tasks §4.1, trang tất định); GET /users dùng meta **{page,limit,total,totalPages}** (như §4.2; limit default 20 trần 100; includeInactive default false → mặc định loại inactive); GET /teams trả **mảng thường** (không phân trang — §9.2 chỉ đòi cho /users, nhóm ít).
@@ -132,7 +132,7 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ### `orphanedTaskCount` đếm chưa-DONE, non-scoped (Bước 5)
 - Loại: **chờ-bổ-sung-spine** → docs/06 §9.3, Bước 5
-- Trạng thái: mở
+- Trạng thái: **đã đóng** (Bước 7 recon, 2026-07-01 — promoted vào docs/06 §9.3 amendment "orphanedTaskCount đếm chưa-DONE")
 - Vị trí: src/tasks/infrastructure/prisma-task.repository.ts (countByAssignee) · src/users/users.service.ts (deactivate)
 - Hợp đồng nói gì: §9.3 trả `orphanedTaskCount` ("task treo") nhưng IM LẶNG đếm tập nào (mọi task non-deleted hay chỉ chưa-DONE) và scope.
 - Quyết định: đếm **chỉ chưa-DONE** (TODO+IN_PROGRESS), non-deleted, **non-scoped** theo assigneeId của user bị deactivate (đường mới `TaskQueryPort.countByAssignee` — admin không nhóm nên không đi qua scoped-load).
@@ -167,6 +167,47 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 - Hợp đồng nói gì: §5 định shape stats nhưng IM LẶNG: (a) sort mảng `byAssignee`; (b) admin (role≠leader, teamId null) gọi `/stats` ra code/status nào; (c) nhóm rỗng task / toàn member rảnh.
 - Quyết định: (a) `byAssignee` sort **name ASC** (khớp tiền lệ roster `GET /teams/:id/members` — cùng là liệt-kê-người-trong-nhóm); (b) admin → **403 `INSUFFICIENT_ROLE`** CÙNG code với member (một `RolesGuard([LEADER])` nhánh `forbid`; admin biết endpoint qua contract ⇒ 403 không lộ thêm; KHÔNG tách admin→404); (c) nhóm rỗng → **200** với byProgress toàn 0, byAssignee các dòng 0 (member rảnh vẫn hiện), total 0, overdue 0 (KHÔNG 404).
 - Lý do: một convention sort cho liệt-kê-người; admin-deny ở rìa role-guard (không scoped-load như /tasks) ⇒ 403 đúng "thấy-được↔403", giữ một guard không tách nhánh; stats luôn 200 cho leader (dashboard hợp lệ kể cả rỗng). Duyệt qua plan-mode AskUserQuestion (Luật số 0 — §5 im lặng → hỏi).
+
+---
+
+### Prisma-error → envelope: bảng map safety-net (Bước 7)
+- Loại: phụ-lục-vĩnh-viễn (KHÔNG đẻ code mới — mọi code ∈ registry §7.3; chỉ chốt bảng P-code→envelope cho lưới an toàn)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/common/http-exception.filter.ts (`mapPrismaError`) · src/common/http-exception.filter.spec.ts (khoá bảng)
+- Hợp đồng nói gì: §7.4 map email-trùng→`EMAIL_TAKEN`, tên-nhóm→`TEAM_NAME_TAKEN`, FK Restrict→break-glass; nhưng IM LẶNG bảng P-code cụ thể, ca P2002 không phân biệt được `meta.target`, và P2025.
+- Quyết định: P2002 đọc `meta.target` (lowercase substring) → `email`→EMAIL_TAKEN / `name`→TEAM_NAME_TAKEN / `leader`→LEADER_ALREADY_EXISTS; target lạ → 500 `INTERNAL_ERROR` (KHÔNG bịa code 409 chung). P2003 → `TEAM_NOT_EMPTY` 409 (luồng hard-delete DUY NHẤT là DELETE /teams). P2025 → `RESOURCE_NOT_FOUND` 404. Code khác → 500. Domain pre-check vẫn là ĐƯỜNG CHÍNH; nhánh này chỉ đỡ đua-điều-kiện.
+- Lý do: mọi ca map khít code có sẵn (Luật số 0 — không đẻ code). Duyệt qua plan-mode AskUserQuestion ("full map" + "ambiguous→500"). Unit test khoá bảng bằng fake `PrismaClientKnownRequestError`, không cần DB.
+
+---
+
+### Throttle auth: con số + window + trust proxy (Bước 7)
+- Loại: phụ-lục-vĩnh-viễn (`RATE_LIMITED` 429 đã có §7.3; chỉ chốt con số mà §6.4 nói "khoảng")
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/auth/auth.controller.ts (`@Throttle` login/refresh) · src/auth/auth.module.ts (`ThrottlerModule.forRoot`) · src/main.ts (`trust proxy`)
+- Hợp đồng nói gì: §6.4 "khoảng 5 lần/phút/IP" cho login, "khoảng 10 lần/phút" cho refresh; IM LẶNG TTL chính xác + cơ chế key IP sau reverse-proxy.
+- Quyết định: login `limit=5, ttl=60000ms`; refresh `limit=10, ttl=60000ms`. `ThrottlerGuard` CHỈ per-method ở `/auth/login` + `/auth/refresh` (KHÔNG APP_GUARD toàn cục — Stats/Tasks/Users/Teams không bị siết). `app.set('trust proxy', 1)` để `req.ip` lấy real client IP sau reverse-proxy same-origin (§1/§6). Pin `@nestjs/throttler@^6.5.0` (peer hỗ trợ Nest 11).
+- Lý do: con số khớp đúng "khoảng" §6.4; throttle chỉ auth (§6.4 không đòi siết toàn API); 429 tái dùng `STATUS_CODE_MAP` sẵn. Duyệt qua plan-mode AskUserQuestion.
+
+---
+
+### Break-glass log seam: shape dòng log (Bước 7)
+- Loại: phụ-lục-vĩnh-viễn (side-effect log, không phải field response; §9.4 đã fix cơ chế "một interceptor ghi log")
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/common/break-glass.interceptor.ts · src/common/authz/break-glass.decorator.ts · src/teams/teams.controller.ts (DELETE :id)
+- Hợp đồng nói gì: §9.4/§11 nói "một dòng log gồm actor, action, target, thời điểm" + "một interceptor ghi log"; IM LẶNG format dòng + level.
+- Quyết định: `BreakGlassInterceptor` + `@BreakGlass('DELETE_TEAM')` ghi MỘT dòng JSON `{actor, action, target, at}` ở `Logger.warn` (context `BreakGlass`), log NGAY khi vào (trước `next.handle()`) nên CẢ lần bị 409 cũng ghi. `actor=req.user.sub`, `target=req.params.id`, `at` ISO-8601.
+- Lý do: JSON greppable + mầm audit-log (MAINT-05); `warn` nổi bật trong ops. Cơ chế interceptor đúng §9.4. Duyệt qua plan-mode AskUserQuestion.
+
+---
+
+### DELETE /teams "rỗng" = zero User rows + phát hiện FK (Bước 7)
+- Loại: phụ-lục-vĩnh-viễn (`TEAM_NOT_EMPTY` 409 đã có §7.3/§10; chỉ chốt định nghĩa "rỗng" mà §9.4/§10 im lặng) + **FLAG prose §9.4 cần người xem**
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/teams/teams.service.ts (`remove`) · src/teams/teams.controller.ts (DELETE :id) · docs/06 §9.4 (câu prose cần người duyệt)
+- Hợp đồng nói gì: §10 "204 nếu rỗng, 409 nếu còn member"; §9.4 "dọn ở đây thực tế là vô hiệu hoá hết member". IM LẶNG định nghĩa "rỗng".
+- Quyết định: "rỗng" = KHÔNG còn User nào trỏ `teamId` (đếm CẢ inactive). pre-check `user.count({teamId})>0` → 409 `TEAM_NOT_EMPTY`; else hard-delete row Team → 204 (Team không có tombstone, không un-delete). P2003 (đua: thêm member giữa check & delete) là safety-net từ filter (entry Prisma-map).
+- **FLAG (agent KHÔNG tự sửa prose GĐ1–6)**: câu §9.4 "dọn ... là vô hiệu hoá hết member" KHÔNG CHÍNH XÁC — `teamId` bất biến (§9.5) + FK Restrict chặn theo sự-tồn-tại-row, nên deactivate KHÔNG giải phóng nhóm; "deactivate hết member rồi DELETE → 204" là BẤT KHẢ. 204 chỉ đạt trên nhóm CHƯA TỪNG có member (vd vừa `POST /teams`). Đã surface + người duyệt ở plan-mode (chọn "rỗng = zero User rows"). **ĐÃ XỬ LÝ (Bước 7 recon, 2026-07-01):** người commission thêm một dòng amendment có-đánh-dấu vào docs/06 §9.4 làm rõ định nghĩa "rỗng" + thực tế FK; câu prose gốc GĐ1–6 giữ nguyên, chỉ bổ sung note bên dưới.
+- Lý do: pre-check khớp đúng FK (count>0 ⟺ FK chặn) ⇒ nhất quán, P2003 thuần đua. Duyệt qua plan-mode AskUserQuestion.
 
 ---
 

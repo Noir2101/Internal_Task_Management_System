@@ -60,6 +60,18 @@ Quy ước mỗi entry:
 
 ---
 
+## [Bước 7] Hardening — Prisma-net + break-glass + throttle + Swagger (rìa, tái dùng scaffold) — 2026-07-01
+- Triệu chứng: (không phải bug) Bước 7 gắn 4 hạng mục ở RÌA; rủi ro là đảo "domain pre-check là chính / Prisma map là lưới" và đẻ code/tầng mới không cần.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - **Tái dùng `STATUS_CODE_MAP[429]→RATE_LIMITED`** đã có từ thiết kế filter — `ThrottlerException` là 429 `HttpException` nên đi đúng nhánh `instanceof HttpException`, KHÔNG cần viết lại map. Nhánh Prisma đặt SAU `HttpException`, TRƯỚC catch-all 500; `TeamNotEmptyException` (AppException) vẫn vào nhánh đầu ⇒ domain pre-check là đường chính, chỉ raw P-code mới chạm `mapPrismaError`.
+  - **Phát hiện FK (đáng nhớ):** `User.teamId` FK `onDelete:Restrict` chặn theo SỰ-TỒN-TẠI-ROW, không theo `isActive`; cộng `teamId` bất biến (§9.5) ⇒ deactivate KHÔNG giải phóng nhóm. Hệ quả: §9.4 prose "dọn = vô hiệu hoá hết member" sai thực tế; "deactivate hết → DELETE → 204" bất khả. Chốt "rỗng = đếm CẢ User (kể cả inactive)" để pre-check khớp đúng FK (count>0 ⟺ FK chặn) ⇒ P2003 thuần đua. (FLAG ở deviations-log để người xem §9.4.)
+  - **`trust proxy` gotcha:** `app.set('trust proxy', 1)` cần app kiểu `NestExpressApplication` (`NestFactory.create<NestExpressApplication>`) — `INestApplication` không có `.set`. Không bật thì sau reverse-proxy prod mọi client chung một IP-bucket ⇒ throttle login vô dụng.
+  - **Log seam ghi TRƯỚC `next.handle()`** (BreakGlassInterceptor) — log NGAY khi vào nên cả lần bị 409 (nhóm còn member) cũng được ghi, đúng "mỗi lần gọi" §9.4 (không chỉ lần 204 thành công).
+  - **Swagger thuần additive:** `ErrorEnvelopeResponse` đăng ký qua `extraModels` để schema xuất hiện dù không endpoint nào `@ApiResponse` nó — KHÔNG đổi shape/luật, cổng 2 projection không liên quan (model tài liệu, không serialize Prisma).
+- Verify: build/lint/test xanh (37/37, +9 case khoá bảng Prisma-map). Manual-via-seed: DELETE nhóm còn member→409; POST nhóm rỗng→DELETE→204→GET→404 + dòng `[BreakGlass]` JSON; throttle >5 login/phút→429 RATE_LIMITED+Retry-After, endpoint khác không siết; Swagger render 4 example + envelope.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra

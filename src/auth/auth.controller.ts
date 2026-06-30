@@ -6,8 +6,10 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Public } from '../common/authz/public.decorator';
 import { AuthService } from './auth.service';
@@ -32,6 +34,8 @@ export class AuthController {
   @Post('login')
   @Public()
   @HttpCode(200) // §6.2: login trả 200 (không phải 201 mặc định của POST)
+  @UseGuards(ThrottlerGuard) // §6.4: throttle CHỈ ở login/refresh (per-method, không toàn cục)
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // ~5 lần/phút/IP — chống dò mật khẩu
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -47,6 +51,8 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @HttpCode(200) // §6.2: refresh trả 200 (không phải 201 mặc định của POST)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // ~10 lần/phút
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,

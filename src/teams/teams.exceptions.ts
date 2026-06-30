@@ -27,3 +27,18 @@ export class LeaderNotTeamMemberException extends AppException {
     );
   }
 }
+
+/**
+ * 409 — break-glass DELETE /teams/:id còn member (§9.4/§10). "Empty" = KHÔNG còn User nào trỏ teamId
+ * (active hay inactive đều chặn — FK Restrict + teamId bất biến §9.5). Domain pre-check (count) trước;
+ * P2003 (đua: thêm member giữa check và delete) là safety-net từ filter Bước 7. §7.3/§10 đã có code.
+ */
+export class TeamNotEmptyException extends AppException {
+  constructor() {
+    super(
+      'TEAM_NOT_EMPTY',
+      HttpStatus.CONFLICT,
+      'Nhóm vẫn còn thành viên — phải dọn hết trước khi giải thể.',
+    );
+  }
+}

@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { AppException, ErrorDetail } from './exceptions/app.exception';
 import { ForbiddenError, NotFoundError } from './exceptions/domain.exception';
@@ -43,8 +44,8 @@ const STATUS_CODE_MAP: Record<number, string> = {
  * - AppException: dùng code/status/message của nó (+ details nếu là ValidationException).
  * - Domain-exception (NotFoundError/ForbiddenError): map → 404 RESOURCE_NOT_FOUND / 403 + code cụ thể.
  * - HttpException built-in: map status→code chung; status lạ coi như gap nội bộ → 500.
+ * - Prisma known-request-error: safety-net cho lỗi raw-constraint (P2002…) — xem `mapPrismaError`.
  * - Khác: 500 INTERNAL_ERROR, log đầy đủ server-side; client không thấy stack/details.
- * Bước 7 cắm thêm nhánh Prisma-error (P2002…) vào đây.
  */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -92,6 +93,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
           `[${requestId}] Unmapped HttpException status=${rawStatus}: ${extractMessage(exception)}`,
         );
       }
+    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      // Bước 7 — lưới an toàn cho lỗi raw-constraint (đua-điều-kiện). Domain pre-check vẫn là đường
+      // chính (service throw AppException trước). Không nhận diện được (null) → 500, KHÔNG bịa code.
+      const mapped = mapPrismaError(exception);
+      if (mapped) {
+        status = mapped.status;
+        code = mapped.code;
+        message = mapped.message;
+      } else {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        code = 'INTERNAL_ERROR';
+        message = 'Có lỗi xảy ra, vui lòng thử lại.';
+        this.logger.warn(
+          `[${requestId}] Unmapped Prisma error code=${exception.code} target=${normalizeTarget(exception.meta?.target) || '?'}`,
+        );
+      }
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       code = 'INTERNAL_ERROR';
@@ -131,4 +148,61 @@ function extractMessage(exception: HttpException): string {
 function stringifyError(e: unknown): string {
   if (e instanceof Error) return `${e.name}: ${e.message}`;
   return String(e);
+}
+
+/** `meta.target` của P2002 là string | string[] | undefined → một chuỗi lowercase để match. */
+function normalizeTarget(target: unknown): string {
+  if (Array.isArray(target)) return target.join(',').toLowerCase();
+  if (typeof target === 'string') return target.toLowerCase();
+  return '';
+}
+
+/**
+ * Bước 7 — map lỗi raw-constraint Prisma → envelope (docs/06 §7.4). CHỈ lưới an toàn cho đua-điều-kiện;
+ * mọi code ∈ registry §7.3 (KHÔNG đẻ code mới). Trả `null` ⇒ không nhận diện → caller dựng 500.
+ *   - P2002 (unique): phân biệt qua `meta.target` — email / tên-nhóm / partial-unique leader; lạ → null.
+ *   - P2003 (FK Restrict): luồng hard-delete DUY NHẤT là `DELETE /teams` (User.teamId Restrict) → 409.
+ *   - P2025 (record-not-found): update/delete trên row đã biến mất → 404 (giấu tồn tại như keystone).
+ */
+function mapPrismaError(
+  e: Prisma.PrismaClientKnownRequestError,
+): { status: number; code: string; message: string } | null {
+  switch (e.code) {
+    case 'P2002': {
+      const target = normalizeTarget(e.meta?.target);
+      if (target.includes('email'))
+        return {
+          status: HttpStatus.CONFLICT,
+          code: 'EMAIL_TAKEN',
+          message: 'Email đã được sử dụng.',
+        };
+      if (target.includes('leader'))
+        return {
+          status: HttpStatus.CONFLICT,
+          code: 'LEADER_ALREADY_EXISTS',
+          message: 'Nhóm đã có leader.',
+        };
+      if (target.includes('name'))
+        return {
+          status: HttpStatus.CONFLICT,
+          code: 'TEAM_NAME_TAKEN',
+          message: 'Tên nhóm đã tồn tại.',
+        };
+      return null; // target không phân biệt được → 500 (đừng bịa code 409 chung)
+    }
+    case 'P2003':
+      return {
+        status: HttpStatus.CONFLICT,
+        code: 'TEAM_NOT_EMPTY',
+        message: 'Nhóm vẫn còn thành viên.',
+      };
+    case 'P2025':
+      return {
+        status: HttpStatus.NOT_FOUND,
+        code: 'RESOURCE_NOT_FOUND',
+        message: 'Không tìm thấy tài nguyên.',
+      };
+    default:
+      return null;
+  }
 }

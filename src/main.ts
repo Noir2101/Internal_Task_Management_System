@@ -1,8 +1,10 @@
 import { ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { ErrorEnvelopeResponse } from './common/dto/error-envelope.response';
 import {
   ErrorDetail,
   ValidationException,
@@ -29,7 +31,11 @@ function flattenValidationErrors(errors: ValidationError[]): ErrorDetail[] {
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Tin proxy 1 hop (§6.4 throttle keyed theo IP): prod same-origin chạy sau reverse-proxy → `req.ip`
+  // lấy từ X-Forwarded-For của hop tin cậy, không phải IP proxy. Dev không proxy nên vô hại.
+  app.set('trust proxy', 1);
 
   // requestId chạy sớm nhất, trước routing → có mặt cả ở 404.
   app.use(requestIdMiddleware);
@@ -52,11 +58,19 @@ async function bootstrap(): Promise<void> {
 
   const config = new DocumentBuilder()
     .setTitle('Internal Task Management System API')
-    .setDescription('ITMS backend — GĐ7. Hợp đồng: docs/06-api-contract.md')
+    .setDescription(
+      'ITMS backend — GĐ7. Hợp đồng: docs/06-api-contract.md. Mọi lỗi trả về cùng một ' +
+        'envelope (model `ErrorEnvelopeResponse`); FE rẽ nhánh trên `code` (registry §7.3). ' +
+        'Lưu ý: Swagger để mở ở đây là lựa chọn DEMO — prod nên gate sau cờ môi trường (§11).',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(app, config);
+  // `extraModels`: đăng ký envelope lỗi MỘT lần để schema xuất hiện trong components dù không endpoint
+  // nào tham chiếu trực tiếp (docs/06 §11 — envelope dùng lại một chỗ).
+  const document = SwaggerModule.createDocument(app, config, {
+    extraModels: [ErrorEnvelopeResponse],
+  });
   SwaggerModule.setup('api/v1/docs', app, document);
 
   const port = process.env.PORT ?? 3000;
