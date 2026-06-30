@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -14,9 +15,14 @@ import { JwtAuthGuard } from './jwt-auth.guard';
  * `JwtAuthGuard` đăng ký APP_GUARD ở đây (JwtModule có sẵn → resolve JwtService) ⇒ áp GLOBAL:
  * mọi endpoint mặc-định-bảo-vệ, opt-out bằng `@Public()`. RolesGuard (common/) apply per-controller
  * ở Bước 4–6, chạy sau guard global này.
+ *
+ * `ThrottlerModule.forRoot` (Bước 7, §6.4) cấp dep cho `ThrottlerGuard`. KHÔNG đăng ký guard này
+ * APP_GUARD (toàn cục) — chỉ `@UseGuards(ThrottlerGuard)` per-method ở `/auth/login` + `/auth/refresh`
+ * (ttl=60000ms; limit override per-route). Stats/Tasks/Users/Teams KHÔNG bị siết.
  */
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>

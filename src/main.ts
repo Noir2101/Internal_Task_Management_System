@@ -1,5 +1,6 @@
 import { ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
@@ -29,7 +30,11 @@ function flattenValidationErrors(errors: ValidationError[]): ErrorDetail[] {
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Tin proxy 1 hop (§6.4 throttle keyed theo IP): prod same-origin chạy sau reverse-proxy → `req.ip`
+  // lấy từ X-Forwarded-For của hop tin cậy, không phải IP proxy. Dev không proxy nên vô hại.
+  app.set('trust proxy', 1);
 
   // requestId chạy sớm nhất, trước routing → có mặt cả ở 404.
   app.use(requestIdMiddleware);
