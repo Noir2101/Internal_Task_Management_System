@@ -25,10 +25,10 @@ infrastructure/  PrismaTaskRepository, Notifier adapter   → hiện thực port
 
 - `TaskWritePort` — tạo / sửa / xoá / đổi tiến độ / reassign. Dùng bởi use-case ghi.
 - `TaskQueryPort` — đọc / lọc / phân trang / aggregate. Dùng bởi `ListTasks` VÀ StatsModule (ISP — Stats chỉ thấy port đọc). Aggregate stats (`byProgress` + `byAssignee` outer-join) là **method của port này**, hiện thực trong adapter. Stats không tự viết query Prisma.
-- `Notifier` — `NoopNotifier` bản nộp; seam cho `EmailNotifier`. **Phát event / gọi port đúng điểm trong `AssignTask`** dù handler chưa làm gì — không phát = sau này thêm email phải sửa lõi.
+- `Notifier` — `NoopNotifier` bản nộp; seam cho `EmailNotifier` (tốt nghiệp ở `docs/07.A-notifications.md`). **Ba method / ba hook point:** `notifyAssigned` (CreateTask, CHỈ khi `assigneeId !== ownerId`), `notifyReassigned` (ReassignTask), `notifyTasksOrphaned` (Users.deactivate). Event MANG ID, không mang email — adapter tra email qua Prisma. **Phát event đúng điểm** dù handler no-op — không phát = sau này thêm email phải sửa lõi. Failure policy: adapter tự nuốt lỗi + log, `notify*` KHÔNG BAO GIỜ reject (email không được vỡ task-write).
 - Wiring ở `tasks.module.ts`:
   `{ provide: TASK_REPOSITORY, useClass: PrismaTaskRepository }`,
-  `{ provide: NOTIFIER, useClass: NoopNotifier }`.
+  `{ provide: NOTIFIER, useFactory: … }` — chọn `EmailNotifier` (env `MAIL_ENABLED=true`) hay `NoopNotifier` (mặc-định-offline cho unit/CI/dev).
 
 ## Use-cases
 

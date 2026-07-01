@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { assertOr403 } from '../../common/authz/scoped';
 import { CLOCK, type Clock } from '../../common/clock';
 import { DueStatus } from '../domain/due-status';
+import { NOTIFIER, type Notifier } from './ports/notifier.port';
 import { TASK_WRITE_PORT, type TaskWritePort } from './ports/task-write.port';
 import { PastDeadlineConfirmationRequiredException } from './task.exceptions';
 import { TaskView } from './task-view';
@@ -20,6 +21,7 @@ type CallerRole = 'ADMIN' | 'LEADER' | 'MEMBER';
 export class CreateTask {
   constructor(
     @Inject(TASK_WRITE_PORT) private readonly write: TaskWritePort,
+    @Inject(NOTIFIER) private readonly notifier: Notifier,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -70,6 +72,18 @@ export class CreateTask {
       ownerId,
       assigneeId: input.assigneeId,
     });
+
+    // Notify-on-assign (seam): CHỈ khi giao cho người khác — báo cho chính người tạo là vô nghĩa.
+    // Phát SAU khi ghi thành công. Adapter tự nuốt lỗi + log (notify* không bao giờ reject) nên
+    // side-effect email KHÔNG-BAO-GIỜ vỡ task-write; không cần try/catch tại call site.
+    if (input.assigneeId !== ownerId) {
+      await this.notifier.notifyAssigned({
+        taskId: task.id,
+        assigneeId: input.assigneeId,
+        ownerId,
+      });
+    }
+
     return { task, overdue: DueStatus.isOverdue(task, now) };
   }
 }

@@ -1,14 +1,18 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateTask } from './application/create-task.usecase';
 import { DeleteTask } from './application/delete-task.usecase';
 import { EditDefinition } from './application/edit-definition.usecase';
 import { GetTask } from './application/get-task.usecase';
 import { ListTasks } from './application/list-tasks.usecase';
-import { NOTIFIER } from './application/ports/notifier.port';
+import { NOTIFIER, type Notifier } from './application/ports/notifier.port';
 import { TASK_QUERY_PORT } from './application/ports/task-query.port';
 import { TASK_WRITE_PORT } from './application/ports/task-write.port';
 import { ReassignTask } from './application/reassign-task.usecase';
 import { UpdateProgress } from './application/update-progress.usecase';
+import { EmailNotifier } from './infrastructure/email-notifier';
+import { createSmtpTransport } from './infrastructure/mail-transport';
 import { NoopNotifier } from './infrastructure/noop-notifier';
 import { PrismaTaskRepository } from './infrastructure/prisma-task.repository';
 import { TasksController } from './interface/tasks.controller';
@@ -25,7 +29,20 @@ import { TasksController } from './interface/tasks.controller';
     PrismaTaskRepository,
     { provide: TASK_WRITE_PORT, useExisting: PrismaTaskRepository },
     { provide: TASK_QUERY_PORT, useExisting: PrismaTaskRepository },
-    { provide: NOTIFIER, useClass: NoopNotifier },
+    // NOTIFIER chọn theo env: MAIL_ENABLED=true → EmailNotifier (nodemailer SMTP, fail-fast nếu
+    // thiếu SMTP_*/MAIL_FROM); còn lại → NoopNotifier (mặc-định-offline: unit/CI/dev không chạm mạng).
+    {
+      provide: NOTIFIER,
+      inject: [ConfigService, PrismaService],
+      useFactory: (config: ConfigService, prisma: PrismaService): Notifier =>
+        config.get<string>('MAIL_ENABLED') === 'true'
+          ? new EmailNotifier(
+              prisma,
+              createSmtpTransport(config),
+              config.get<string>('MAIL_FROM')!,
+            )
+          : new NoopNotifier(),
+    },
     CreateTask,
     ListTasks,
     GetTask,

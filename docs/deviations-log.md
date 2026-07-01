@@ -211,6 +211,22 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ---
 
+### Notifications: transport, tên env, nội dung email, failure policy (extension: notifications)
+- Loại: phụ-lục-vĩnh-viễn (tính năng bonus NGOÀI hợp đồng đông cứng — KHÔNG đẻ code/status/field FE-observable; §9.3 đã tiên liệu seam Noop→Email)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/tasks/infrastructure/email-notifier.ts · src/tasks/infrastructure/mail-transport.ts · src/tasks/tasks.module.ts (factory NOTIFIER theo env) · src/tasks/application/ports/notifier.port.ts (`notifyAssigned`) · src/tasks/application/create-task.usecase.ts (hook) · .env.example · docs/07.A-notifications.md
+- Hợp đồng nói gì: §9.3 "phát qua `Notifier`, NoopNotifier bản nộp, EmailNotifier portfolio, báo assignee mới / báo leader"; §6.4 quy ước cấu hình qua env + gate theo cờ. IM LẶNG: provider/transport cụ thể, tên biến env, nội dung email, cơ chế nuốt lỗi, và hook lúc CREATE (chỉ nói reassign + orphaned).
+- Quyết định (đã duyệt plan-mode AskUserQuestion — Luật số 0):
+  - **Transport:** nodemailer làm lớp chung; provider prod = Resend qua SMTP (`smtp.resend.com`). Đổi provider = đổi env `SMTP_*`, không đổi code. Gate bằng cờ `MAIL_ENABLED` (false → NoopNotifier mặc-định-offline; true → EmailNotifier). Fail-fast lúc init nếu bật mà thiếu `SMTP_*`/`MAIL_FROM`.
+  - **Tên env:** `MAIL_ENABLED`, `MAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`. Chỉ ở `.env` (gitignore); `.env.example` chỉ placeholder.
+  - **Nội dung email:** tiếng Việt, text thuần, ngắn (subject + vài dòng title/deadline/người giao). Không HTML.
+  - **Failure policy:** await SAU commit, adapter TỰ bọc try/catch + log, `notify*` KHÔNG BAO GIỜ reject (che cả reassign/deactivate vốn await không try/catch). Không fire-and-forget, không queue.
+  - **Hook CREATE + self-assign:** thêm method `notifyAssigned` RIÊNG + `AssignedEvent` (mang ID); CreateTask phát CHỈ khi `assigneeId !== ownerId` (bỏ self-assign). notifyReassigned/notifyTasksOrphaned giữ nguyên; EmailNotifier làm đủ 3 (orphaned resolve LEADER của teamId qua Prisma).
+  - **Nhãn:** `extension: notifications` (KHÔNG renumber GĐ8; GĐ8 vẫn coverage/e2e).
+- Lý do: mọi quyết định khớp đúng seam §9.3 + quy ước env §6.4; không thêm surface FE-observable (không field/status/code mới). Event mang ID (không email) giữ domain/application thuần (cổng 1). Adapter-nuốt-lỗi bảo toàn bất biến "email không vỡ task-write".
+
+---
+
 ## Cách thêm entry mới
 
 Mỗi khi `/check-spine` hoặc plan-mode review gặp một chỗ spine để ngỏ và bạn duyệt một giá trị cụ thể, thêm entry vào đây **trước khi commit** — đừng để trôi vào chỉ commit message. Gắn `Loại`:
