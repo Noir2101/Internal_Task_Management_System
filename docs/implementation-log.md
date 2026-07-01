@@ -99,6 +99,14 @@ Quy ước mỗi entry:
 
 ---
 
+## [Bước 8] Build xuất sai `dist/main.js` vì `prisma/seed.ts` lọt vào compile — 2026-07-02
+- Triệu chứng: `npm run start:prod` (`node dist/main`) chết `Cannot find module dist/main` — entry thật ở `dist/src/main.js`, cộng thêm một `dist/prisma/seed.js` thừa trong bản build production.
+- Nguyên nhân gốc: `tsconfig.build.json` exclude `test` + `**/*spec.ts` nhưng KHÔNG exclude `prisma`. `tsc` do đó compile cả `prisma/seed.ts` (ngoài `src/`); rootDir được TS suy thành ROOT repo (common path của mọi input) thay vì `src/` ⇒ output dịch thành `dist/src/**` (main thành `dist/src/main.js`) và kéo seed dev vào `dist/prisma/seed.js`. Là bug có sẵn từ trước GĐ8 (seed.ts vốn luôn tồn tại), không phải regression — chỉ lộ ra khi chạy `start:prod` lúc smoke throttle.
+- Sửa: `tsconfig.build.json` thêm `"prisma"` vào `exclude`. rootDir về `src/` ⇒ `dist/main.js` (khớp script `start:prod`), và seed dev không còn ship trong bản build. An toàn: `prisma db seed` chạy `tsx prisma/seed.ts` trực tiếp (không dùng dist); không src nào import `prisma/seed`.
+- Verify: `npm run build` → `dist/main.js` tồn tại, `dist/src` biến mất, `dist/prisma/` giờ CHỈ là `src/prisma/*` (PrismaModule/Service) compile, không còn `seed.js`. `npm run start:prod` boot OK, `GET /api/v1/health` → `{"status":"ok"}`. lint/test/build xanh.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra
