@@ -1,60 +1,15 @@
-import { ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { configureApp } from './app-config';
 import { ErrorEnvelopeResponse } from './common/dto/error-envelope.response';
-import {
-  ErrorDetail,
-  ValidationException,
-} from './common/exceptions/app.exception';
-import { HttpExceptionFilter } from './common/http-exception.filter';
-import { requestIdMiddleware } from './common/request-id.middleware';
-
-/** Phẳng hoá lỗi class-validator → details[] {field, constraint} cho VALIDATION_FAILED. */
-function flattenValidationErrors(errors: ValidationError[]): ErrorDetail[] {
-  const out: ErrorDetail[] = [];
-  const walk = (errs: ValidationError[], parent = ''): void => {
-    for (const e of errs) {
-      const field = parent ? `${parent}.${e.property}` : e.property;
-      if (e.constraints) {
-        for (const constraint of Object.values(e.constraints)) {
-          out.push({ field, constraint });
-        }
-      }
-      if (e.children?.length) walk(e.children, field);
-    }
-  };
-  walk(errors);
-  return out;
-}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Tin proxy 1 hop (§6.4 throttle keyed theo IP): prod same-origin chạy sau reverse-proxy → `req.ip`
-  // lấy từ X-Forwarded-For của hop tin cậy, không phải IP proxy. Dev không proxy nên vô hại.
-  app.set('trust proxy', 1);
-
-  // requestId chạy sớm nhất, trước routing → có mặt cả ở 404.
-  app.use(requestIdMiddleware);
-  // Parse Cookie header → req.cookies (refresh token đọc ở /auth/refresh, /auth/logout).
-  app.use(cookieParser());
-
-  app.setGlobalPrefix('api/v1');
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      exceptionFactory: (errors: ValidationError[]) =>
-        new ValidationException(flattenValidationErrors(errors)),
-    }),
-  );
-
-  app.useGlobalFilters(new HttpExceptionFilter());
+  // Pipeline HTTP dùng chung với e2e (requestId, cookieParser, prefix, ValidationPipe, filter).
+  configureApp(app);
 
   const config = new DocumentBuilder()
     .setTitle('Internal Task Management System API')

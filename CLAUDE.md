@@ -80,7 +80,7 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Trình tự build (nền ngang trước, lát dọc sau)
 
-> Trạng thái: **Bước 1–7 ✅ — GĐ7 backend HOÀN TẤT** (skeleton + 3 cổng · auth thin · common authz scaffold · Tasks deep + keystone · Users+Teams thin · Stats read-model · Hardening: Prisma-net + break-glass + throttle + Swagger). **+ extension: notifications ✅** (seam `Notifier` tốt nghiệp Noop→Email · nodemailer SMTP + Resend · hook notify-on-assign · env `MAIL_ENABLED`/`SMTP_*` xem `.env.example` + `docs/07.A-notifications.md`). Kế: **GĐ8** (coverage rộng / e2e).
+> Trạng thái: **Bước 1–7 ✅ — GĐ7 backend HOÀN TẤT** (skeleton + 3 cổng · auth thin · common authz scaffold · Tasks deep + keystone · Users+Teams thin · Stats read-model · Hardening: Prisma-net + break-glass + throttle + Swagger). **+ extension: notifications ✅** (seam `Notifier` tốt nghiệp Noop→Email · nodemailer SMTP + Resend · hook notify-on-assign · env `MAIL_ENABLED`/`SMTP_*` xem `.env.example` + `docs/07.A-notifications.md`). **+ GĐ8: test hardening ✅** (lưới e2e 42 test trên DB `itms_test` riêng — auth/users/teams/tasks · unit EmailNotifier · truncate+reseed per-test · `configureApp`/`seedDatabase` trích để bật test · throttle vô hiệu trong lưới + smoke tay · xem `docs/08-test-plan.md`). Kế: **GĐ9** (frontend).
 
 1. **Walking skeleton:** Nest scaffold · Prisma wire · **migration đầu `--create-only` + 4 raw-SQL** (xem `/migrate`) · seed · global ValidationPipe + exception filter (envelope + **requestId**) · prefix `/api/v1` · Swagger · `GET /health` chạm DB. **Dựng luôn 3 cổng cơ học.**
 2. **Auth (thin):** login/refresh-rotate/logout/me · RefreshToken store · rotation + reuse-detection · hashing = argon2 (khớp seed) · JWT guard + claims `sub/role/teamId`. (throttle để bước 7)
