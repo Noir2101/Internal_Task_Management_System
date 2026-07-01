@@ -85,6 +85,20 @@ Quy ước mỗi entry:
 
 ---
 
+## [Bước 8] Test hardening — lưới e2e + unit EmailNotifier trên DB test riêng — 2026-07-02
+- Triệu chứng: (không phải bug) GĐ7 hoãn coverage rộng sang GĐ8 (build-plan §4). Cần biến verify tay rải rác thành lưới tự động bền. Build-plan im lặng về hạ tầng test → quyết định theo Luật số 0 (hỏi người, đã xác nhận).
+- Quyết định test-infra (không hiển nhiên từ diff):
+  - **DB test `itms_test` riêng trên compose Postgres 18**, KHÔNG Testcontainers (tránh dependency nặng — nhất quán §6). `globalSetup` CREATE DATABASE (qua PrismaClient nối DB maintenance `postgres`, nuốt 42P04 nếu đã có) rồi `prisma migrate deploy` (KHÔNG db push/reset). `DATABASE_URL` set ở `setupFiles` (env.ts) TRƯỚC khi import AppModule; dotenv của @nestjs/config không override process.env đã set nên URL test thắng `.env`.
+  - **Cô lập = truncate + reseed per-test** (`beforeEach`), `maxWorkers:1` (một DB dùng chung). Hash argon2 của seed **cache một lần cho cả run** (argon2 ~100ms/hash) — reseed per-test chỉ còn chi phí insert.
+  - **Hai refactor bảo-toàn-hành-vi để bật test** (KHÔNG đổi logic): (a) trích `configureApp(app)` khỏi `main.ts` → `src/app-config.ts`, e2e gọi CÙNG pipeline prod nên envelope/validation không drift; (b) trích `seedDatabase(prisma, opts?)` khỏi `prisma/seed.ts` trả `SeedHandles` (ID để assert), wrapper CLI vẫn gọi qua `require.main===module` nên hành vi seed giữ nguyên, `opts.passwordHash` cho e2e truyền hash cache.
+  - **Throttle vô hiệu trong lưới**: `overrideGuard(ThrottlerGuard)` → pass-through (login-nhiều không dính 429 giả). 429 verify bằng smoke tay (docs/08 §6). e2e xác thực bằng **login thật** → đi qua nguyên JwtAuthGuard + record-level authz; refresh/logout replay `Set-Cookie`.
+  - **Notifier = NoopNotifier** (xoá `MAIL_ENABLED` ở env.ts) → e2e không gửi email. Unit EmailNotifier mock Transporter + PrismaService: khoá bất biến "transporter throw → notify* VẪN resolve" (email không vỡ task-write).
+  - **Lint**: e2e đọc `res.body` kiểu `any` (supertest) → thêm override CHỈ nới họ `no-unsafe-*` cho `test/**`. KHÔNG chạm 3 cổng cơ học (domain-purity/projection/clock ở block src/tasks & src/stats).
+- Phát hiện: phiên GĐ8 đầu **KHÔNG bắt bug logic production nào** — mọi hành vi khớp hợp đồng (code + status). Các code khó (reuse→SESSION_EXPIRED, member-reassign→TASK_MEMBER_SELF_ASSIGN_ONLY record-level, orphanedTaskCount=2 loại DONE+soft-deleted, DONE-quá-hạn không overdue, hide→404) đều xanh ngay lần chạy đầu.
+- Verify: unit 45/45 (39 cũ + 6 EmailNotifier) · e2e 42/42 (4 spec) · lint xanh (3 cổng giữ nguyên) · build xanh · seed CLI in "Seed xong…" exit 0 (refactor không phá). Doc: tạo `docs/08-test-plan.md` (chiến lược + ma trận). Không sửa docs/00–06.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra

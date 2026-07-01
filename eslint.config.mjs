@@ -68,4 +68,16 @@ export default tseslint.config(
       }],
     },
   },
+  // GĐ8 — e2e test đọc body HTTP kiểu `any` (supertest `res.body`). Nới CHỈ họ no-unsafe-* cho `test/**`.
+  // KHÔNG chạm 3 cổng cơ học (domain-purity/projection/clock nằm ở block src/tasks & src/stats trên).
+  {
+    files: ['test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
 );
