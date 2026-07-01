@@ -72,6 +72,19 @@ Quy ước mỗi entry:
 
 ---
 
+## [Extension: notifications] Tốt nghiệp seam Notifier — Noop→Email + hook notify-on-assign — 2026-07-01
+- Triệu chứng: (không phải bug) tính năng bonus NGOÀI hợp đồng đông cứng — hiện thực seam §9.3. Trạng thái trước: reassign + deactivate đã phát event đúng điểm (no-op handler); `CreateTask` CHƯA phát gì (hook notify-on-assign vắng hẳn); binding là `NoopNotifier`.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - **Failure-swallow đặt Ở ADAPTER, không ở call site.** `EmailNotifier` bọc mỗi method try/catch + log, `notify*` KHÔNG BAO GIỜ reject. Chọn adapter (không call site) vì bảo đảm này che CẢ 2 call site cũ (`ReassignTask`, `Users.deactivate`) vốn `await this.notifier...` mà KHÔNG tự try/catch — nếu adapter ném thì 2 luồng đó đột nhiên vỡ được vì lỗi email, dù ta không đụng vào chúng. Đặt "không reject" ở adapter đóng khe này mà không sửa file cũ. CreateTask do đó cũng chỉ `await` sạch, không cần try/catch.
+  - **Gate self-assign ở use-case, không ở adapter.** `assigneeId !== ownerId` là luật nghiệp vụ "khi nào báo" → thuộc `CreateTask`. Adapter chỉ biết "gửi cho ai" (recipient resolution), không biết "có nên gửi không".
+  - **Event mang ID, adapter tra Prisma.** Thêm `AssignedEvent {taskId, assigneeId, ownerId}` + method `notifyAssigned` (đổi luật hexagonal → sync `src/tasks/CLAUDE.md`). Domain/application KHÔNG chạm email (cổng 1); `EmailNotifier` (infrastructure) tra `user`/`task`/leader qua Prisma. `notifyTasksOrphaned` resolve LEADER của `teamId` (`role=LEADER, isActive=true`); không có leader → log + skip (không ném).
+  - **Binding chọn adapter qua `useFactory` theo env.** `MAIL_ENABLED==='true'` → `new EmailNotifier(prisma, createSmtpTransport(config), MAIL_FROM)`; else `NoopNotifier`. `createSmtpTransport` fail-fast (throw lúc init) nếu thiếu `SMTP_*`/`MAIL_FROM` — thà app không lên còn hơn lên mà câm. Giữ `NoopNotifier` làm đường mặc-định-offline cho unit/CI/dev (test 39/39 chạy path Noop, 0 mạng).
+  - **nodemailer 9.x** (framework-agnostic, không peer Nest). Provider prod = Resend qua SMTP; đổi provider = đổi env.
+  - Gotcha đã biết (Bước 4/5): inject port qua `@Inject(NOTIFIER)` phải `import type { Notifier }` — đã áp dụng ở `create-task.usecase.ts` + factory `tasks.module.ts`.
+- Verify: build/lint/test xanh (39/39, +2 spec create-task: cross-assign phát đúng event / self-assign KHÔNG phát). EmailNotifier verify TAY qua Resend (không unit test chạm SMTP). Bất biến FE-observable: 0 field/status/code mới, email không vào response.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra

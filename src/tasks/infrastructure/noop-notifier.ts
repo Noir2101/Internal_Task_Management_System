@@ -8,6 +8,10 @@ import { Notifier } from '../application/ports/notifier.port';
  */
 @Injectable()
 export class NoopNotifier implements Notifier {
+  notifyAssigned(): Promise<void> {
+    return Promise.resolve();
+  }
+
   notifyReassigned(): Promise<void> {
     return Promise.resolve();
   }
