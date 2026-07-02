@@ -4,6 +4,8 @@ import type { Role } from '../auth/types';
 export const paths = {
   login: '/login',
   tasks: '/tasks',
+  taskNew: '/tasks/new',
+  taskDetail: (id: string) => `/tasks/${id}`,
   dashboard: '/dashboard',
   adminUsers: '/admin/users',
   adminTeams: '/admin/teams',
