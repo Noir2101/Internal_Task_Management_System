@@ -6,7 +6,9 @@ import { NotFoundPage } from '../pages/NotFoundPage';
 import { AdminTeamsPage } from '../pages/placeholders/AdminTeamsPage';
 import { AdminUsersPage } from '../pages/placeholders/AdminUsersPage';
 import { DashboardPage } from '../pages/placeholders/DashboardPage';
-import { TasksPage } from '../pages/placeholders/TasksPage';
+import { TasksListPage } from '../pages/TasksListPage';
+import { TaskCreatePage } from '../pages/TaskCreatePage';
+import { TaskDetailPage } from '../pages/TaskDetailPage';
 import { IndexRedirect } from './IndexRedirect';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleRoute } from './RoleRoute';
@@ -23,7 +25,11 @@ export const router = createBrowserRouter([
           { index: true, element: <IndexRedirect /> },
           {
             element: <RoleRoute allow={['MEMBER', 'LEADER']} />,
-            children: [{ path: 'tasks', element: <TasksPage /> }],
+            children: [
+              { path: 'tasks', element: <TasksListPage /> },
+              { path: 'tasks/new', element: <TaskCreatePage /> },
+              { path: 'tasks/:id', element: <TaskDetailPage /> },
+            ],
           },
           {
             element: <RoleRoute allow={['LEADER']} />,
