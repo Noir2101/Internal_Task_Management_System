@@ -13,8 +13,9 @@ một rule đã viết.
 
 ## Stack & lệnh
 
-- NestJS + Postgres + Prisma **pin v6.19** (v7 bỏ `url=env()` → phá schema/seed; đừng bump). (React FE same-origin — ngoài phạm vi GĐ7 backend.)
+- NestJS + Postgres + Prisma **pin v6.19** (v7 bỏ `url=env()` → phá schema/seed; đừng bump). (React FE `/web` same-origin — GĐ9, xem `docs/09-frontend-plan.md`.)
 - `npm run start:dev` · `npm run lint` · `npm test` · `npm run build`
+- FE cùng repo ở `web/`: `cd web && npm run dev` (Vite dev, proxy `/api` sang backend `:3000`). Chưa scaffold — build từ Slice 1.
 - Prisma: dùng `/migrate`. KHÔNG `prisma db push`, KHÔNG `prisma migrate reset`.
 - Prefix tĩnh `/api/v1`. Swagger ở `/api/v1/docs`.
 
@@ -29,7 +30,9 @@ src/
   teams/          thin   — CRUD, leader-swap atomic, roster members
   stats/          thin   — read-model, CHỈ qua TaskQueryPort
 prisma/           schema.prisma · seed.ts · migrations/
-docs/             00–06 spine (nguồn sự thật) · 07-build-plan.md
+docs/             00–06 spine (nguồn sự thật) · 07-build-plan.md · 09-frontend-plan.md
+web/              React SPA (GĐ9) — Vite proxy same-origin; api-client refresh-retry-once; token RAM (chưa scaffold; xem docs/09)
+STYLE-GUIDE.md    quy ước viết tài liệu kỹ thuật (đính vào session viết docs)
 ```
 
 `users/` và `teams/` tách đôi cho khớp resource trong hợp đồng; gộp thành một `org/` cũng được nếu muốn.
@@ -80,7 +83,7 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Trình tự build (nền ngang trước, lát dọc sau)
 
-> Trạng thái: **Bước 1–7 ✅ — GĐ7 backend HOÀN TẤT** (skeleton + 3 cổng · auth thin · common authz scaffold · Tasks deep + keystone · Users+Teams thin · Stats read-model · Hardening: Prisma-net + break-glass + throttle + Swagger). **+ extension: notifications ✅** (seam `Notifier` tốt nghiệp Noop→Email · nodemailer SMTP + Resend · hook notify-on-assign · env `MAIL_ENABLED`/`SMTP_*` xem `.env.example` + `docs/07.A-notifications.md`). **+ GĐ8: test hardening ✅** (lưới e2e 42 test trên DB `itms_test` riêng — auth/users/teams/tasks · unit EmailNotifier · truncate+reseed per-test · `configureApp`/`seedDatabase` trích để bật test · throttle vô hiệu trong lưới + smoke tay · xem `docs/08-test-plan.md`). Kế: **GĐ9** (frontend).
+> Trạng thái: **Bước 1–7 ✅ — GĐ7 backend HOÀN TẤT** (skeleton + 3 cổng · auth thin · common authz scaffold · Tasks deep + keystone · Users+Teams thin · Stats read-model · Hardening: Prisma-net + break-glass + throttle + Swagger). **+ extension: notifications ✅** (seam `Notifier` tốt nghiệp Noop→Email · nodemailer SMTP + Resend · hook notify-on-assign · env `MAIL_ENABLED`/`SMTP_*` xem `.env.example` + `docs/07.A-notifications.md`). **+ GĐ8: test hardening ✅** (lưới e2e 42 test trên DB `itms_test` riêng — auth/users/teams/tasks · unit EmailNotifier · truncate+reseed per-test · `configureApp`/`seedDatabase` trích để bật test · throttle vô hiệu trong lưới + smoke tay · xem `docs/08-test-plan.md`). **+ GĐ9: frontend plan ✅** (docs/09 — React+Vite+TS · MUI · TanStack Query · RHF+Zod · React Router · same-origin /web + Vite proxy · charts Recharts · 3 slice: skeleton+auth/tasks/admin+stats · doc theo `STYLE-GUIDE.md`). Kế: **build Slice 1** (skeleton+auth).
 
 1. **Walking skeleton:** Nest scaffold · Prisma wire · **migration đầu `--create-only` + 4 raw-SQL** (xem `/migrate`) · seed · global ValidationPipe + exception filter (envelope + **requestId**) · prefix `/api/v1` · Swagger · `GET /health` chạm DB. **Dựng luôn 3 cổng cơ học.**
 2. **Auth (thin):** login/refresh-rotate/logout/me · RefreshToken store · rotation + reuse-detection · hashing = argon2 (khớp seed) · JWT guard + claims `sub/role/teamId`. (throttle để bước 7)
