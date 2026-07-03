@@ -107,7 +107,7 @@ enforce thật. Cột "Must/Could" theo MoSCoW `docs/01 §9`.
 | Teams: list | `/admin/teams` | `GET /teams` (mảng, không paginate) | Must |
 | Teams: tạo, đổi tên | `/admin/teams` | `POST /teams` · `PATCH /teams/:id` | Must |
 | Teams: đặt leader (atomic swap) | `/admin/teams/:id` | `PUT /teams/:id/leader` (userId = members) | Must |
-| Teams: xem members | `/admin/teams/:id` | `GET /teams/:id/members` | Must |
+| Teams: xem members | `/admin/teams/:id` | `GET /users?teamId` | Must |
 | Teams: giải thể (break-glass) | `/admin/teams/:id` | `DELETE /teams/:id` (409 `TEAM_NOT_EMPTY`) | Must |
 
 ---
@@ -184,7 +184,9 @@ web/
 - Access token chỉ ở RAM; refresh qua cookie HttpOnly (JS không đọc được).
 - Deadline quá khứ: FE xác nhận rồi gửi lại kèm `allowPastDeadline` (rule vẫn ở backend).
 - Ẩn hoặc hiện theo role chỉ là UX; mọi thao tác vẫn gọi API và tôn trọng 403 hoặc 404 trả về.
-- Enum verbatim (`TODO`, `IN_PROGRESS`, `DONE`; `ADMIN`, `LEADER`, `MEMBER`), không có lớp dịch.
+- Enum verbatim TRÊN WIRE và khi rẽ nhánh: giá trị gửi API và so trong code luôn là enum canonical
+  (`TODO`, `IN_PROGRESS`, `DONE`; `ADMIN`, `LEADER`, `MEMBER`). UI được phép hiển thị nhãn tiếng Việt qua
+  map trình bày (`web/src/lib/labels.ts`); value giữ nguyên enum, KHÔNG phải lớp dịch trong protocol.
 
 ### 3.6. Same-origin (dev và prod)
 

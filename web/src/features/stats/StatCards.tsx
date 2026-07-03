@@ -1,6 +1,7 @@
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import type { StatsResponse } from './types';
 import { OVERDUE_COLOR, PROGRESS_COLOR, PROGRESS_ORDER } from './colors';
+import { PROGRESS_LABELS } from '../../lib/labels';
 
 /**
  * KPI row (docs/09 §2.3). Total + the 3 progress buckets + overdue. Overdue is a SEPARATE red tile,
@@ -47,7 +48,7 @@ export function StatCards({ stats }: { stats: StatsResponse }) {
     <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
       <StatCard label="Tổng công việc" value={stats.total} />
       {PROGRESS_ORDER.map((k) => (
-        <StatCard key={k} label={k} value={stats.byProgress[k]} dotColor={PROGRESS_COLOR[k]} />
+        <StatCard key={k} label={PROGRESS_LABELS[k]} value={stats.byProgress[k]} dotColor={PROGRESS_COLOR[k]} />
       ))}
       <StatCard label="Quá hạn" value={stats.overdue} emphasis />
     </Stack>

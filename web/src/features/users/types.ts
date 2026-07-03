@@ -2,8 +2,8 @@ import type { Role } from '../../auth/types';
 
 /**
  * User feature types — mirror the frozen backend projection (docs/06 §8.2) and request DTOs
- * (docs/06 §8.1). Enums are VERBATIM from the contract (docs/09 §3.5) — no translation layer.
- * FE never invents server-derived fields (id/isActive/createdAt) into request bodies.
+ * (docs/06 §8.1). Enum VALUES are verbatim from the contract on the wire (docs/09 §3.5); UI labels
+ * come from lib/labels.ts. FE never invents server-derived fields (id/isActive/createdAt) into bodies.
  */
 
 /** Role axis (docs/06 §1). Ordered for Select rendering; type is the single source in auth/types. */

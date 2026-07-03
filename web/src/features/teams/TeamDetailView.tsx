@@ -20,6 +20,7 @@ import {
   Typography,
 } from '@mui/material';
 import { ApiError } from '../../lib/error';
+import { ROLE_LABELS } from '../../lib/labels';
 import { ErrorState } from '../../components/ErrorState';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useSnackbar } from '../../components/useSnackbar';
@@ -128,7 +129,7 @@ export function TeamDetailView({ teamId }: { teamId: string }) {
                     <TableCell>
                       <Chip
                         size="small"
-                        label={m.role}
+                        label={ROLE_LABELS[m.role]}
                         color={m.role === 'LEADER' ? 'primary' : 'default'}
                       />
                     </TableCell>

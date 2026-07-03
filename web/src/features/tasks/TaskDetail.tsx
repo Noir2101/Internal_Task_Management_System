@@ -177,7 +177,10 @@ export function TaskDetail({ id }: { id: string }) {
               onSubmit={async (payload) => {
                 await updateMut.mutateAsync(payload as UpdateTaskInput);
               }}
-              onSuccess={() => setEditOpen(false)}
+              onSuccess={() => {
+                setEditOpen(false);
+                notify('Đã cập nhật công việc.', 'success');
+              }}
               onCancel={() => setEditOpen(false)}
             />
           </Box>

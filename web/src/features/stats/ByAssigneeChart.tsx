@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Legend,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -20,6 +19,7 @@ import {
 } from '@mui/material';
 import type { StatsResponse } from './types';
 import { CHART_INK, OVERDUE_COLOR, PROGRESS_COLOR, PROGRESS_ORDER } from './colors';
+import { PROGRESS_LABELS } from '../../lib/labels';
 
 /**
  * byAssignee stacked bar + companion table (docs/09 §2.3). The stack has EXACTLY the 3 progress
@@ -69,12 +69,12 @@ export function ByAssigneeChart({ stats }: { stats: StatsResponse }) {
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip cursor={{ fill: 'rgba(11,11,11,0.04)' }} />
               <Legend />
               {PROGRESS_ORDER.map((k, i) => (
                 <Bar
                   key={k}
                   dataKey={k}
+                  name={PROGRESS_LABELS[k]}
                   stackId="progress"
                   fill={PROGRESS_COLOR[k]}
                   stroke={CHART_INK.surface}
@@ -93,7 +93,7 @@ export function ByAssigneeChart({ stats }: { stats: StatsResponse }) {
                   <TableCell>Người được giao</TableCell>
                   {PROGRESS_ORDER.map((k) => (
                     <TableCell key={k} align="right">
-                      {k}
+                      {PROGRESS_LABELS[k]}
                     </TableCell>
                   ))}
                   <TableCell align="right">Tổng</TableCell>

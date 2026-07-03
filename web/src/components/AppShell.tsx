@@ -10,6 +10,7 @@ import {
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import type { Role } from '../auth/types';
+import { ROLE_LABELS } from '../lib/labels';
 import { paths } from '../routes/paths';
 
 interface NavItem {
@@ -67,7 +68,7 @@ export function AppShell() {
           <Box sx={{ flexGrow: 1 }} />
           {identity && (
             <Typography variant="body2" sx={{ mr: 2 }}>
-              {identity.name} · {identity.role}
+              {identity.name} · {ROLE_LABELS[identity.role]}
             </Typography>
           )}
           <Button color="inherit" onClick={handleLogout} disabled={loggingOut}>
