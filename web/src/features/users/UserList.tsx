@@ -44,7 +44,8 @@ const ROLE_COLOR: Record<Role, 'secondary' | 'primary' | 'default'> = {
 };
 
 interface Filters {
-  role: '' | Role;
+  // 'all' is the unfiltered sentinel (non-empty → the label shrinks without displayEmpty).
+  role: 'all' | Role;
   teamId: string;
   includeInactive: boolean;
 }
@@ -155,7 +156,7 @@ export function UserList() {
   const { data: teams = [] } = useTeams();
   const teamName = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
 
-  const [filters, setFilters] = useState<Filters>({ role: '', teamId: '', includeInactive: false });
+  const [filters, setFilters] = useState<Filters>({ role: 'all', teamId: 'all', includeInactive: false });
   const [page, setPage] = useState(1);
 
   const patchFilters = (patch: Partial<Filters>) => {
@@ -165,8 +166,8 @@ export function UserList() {
 
   const params: ListUsersParams = useMemo(
     () => ({
-      role: filters.role || undefined,
-      teamId: filters.teamId || undefined,
+      role: filters.role === 'all' ? undefined : filters.role,
+      teamId: filters.teamId === 'all' ? undefined : filters.teamId,
       includeInactive: filters.includeInactive || undefined,
       page,
       limit: LIMIT,
@@ -256,11 +257,10 @@ export function UserList() {
             label="Vai trò"
             size="small"
             value={filters.role}
-            SelectProps={{ displayEmpty: true }}
             onChange={(e) => patchFilters({ role: e.target.value as Filters['role'] })}
             sx={{ minWidth: 160 }}
           >
-            <MenuItem value="">Tất cả vai trò</MenuItem>
+            <MenuItem value="all">Tất cả</MenuItem>
             {ROLE_VALUES.map((r) => (
               <MenuItem key={r} value={r}>
                 {ROLE_LABELS[r]}
@@ -272,11 +272,10 @@ export function UserList() {
             label="Nhóm"
             size="small"
             value={filters.teamId}
-            SelectProps={{ displayEmpty: true }}
             onChange={(e) => patchFilters({ teamId: e.target.value })}
             sx={{ minWidth: 200 }}
           >
-            <MenuItem value="">Tất cả nhóm</MenuItem>
+            <MenuItem value="all">Tất cả</MenuItem>
             {teams.map((t) => (
               <MenuItem key={t.id} value={t.id}>
                 {t.name}

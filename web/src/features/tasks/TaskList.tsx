@@ -40,9 +40,9 @@ export function TaskList({ lockedFilter }: { lockedFilter?: { assigneeId: string
   const { data: roster = [] } = useRoster(identity?.teamId ?? null);
 
   const [filters, setFilters] = useState<TaskFiltersValue>({
-    progress: '',
+    progress: 'all',
     overdue: 'all',
-    assigneeId: '',
+    assigneeId: 'all',
     q: '',
   });
   const [debouncedQ, setDebouncedQ] = useState('');
@@ -62,10 +62,12 @@ export function TaskList({ lockedFilter }: { lockedFilter?: { assigneeId: string
 
   const params: ListTasksParams = useMemo(
     () => ({
-      progress: filters.progress || undefined,
-      // Tri-state → boolean: 'all' omits the param; the two axes stay separate (docs/09 §3.5).
+      // 'all' is the unfiltered sentinel on every axis → omit the param; the axes stay separate (docs/09 §3.5).
+      progress: filters.progress === 'all' ? undefined : filters.progress,
       overdue: filters.overdue === 'all' ? undefined : filters.overdue === 'overdue',
-      assigneeId: lockedFilter?.assigneeId ?? (filters.assigneeId || undefined),
+      assigneeId:
+        lockedFilter?.assigneeId ??
+        (filters.assigneeId === 'all' ? undefined : filters.assigneeId),
       q: debouncedQ || undefined,
       page,
       limit: LIMIT,

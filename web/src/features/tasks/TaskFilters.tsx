@@ -3,9 +3,13 @@ import { PROGRESS_VALUES } from './types';
 import type { OverdueFilter, Progress, RosterMember } from './types';
 import { PROGRESS_LABELS } from '../../lib/labels';
 
-/** Filter UI state. Empty string = "all" for the select-style filters. */
+/**
+ * Filter UI state. `'all'` is the unfiltered sentinel for the select filters (maps to omitting the
+ * param). It is non-empty on purpose, so MUI's label shrinks naturally and never needs displayEmpty.
+ * `overdue` is its own tri-state.
+ */
 export interface TaskFiltersValue {
-  progress: Progress | '';
+  progress: Progress | 'all';
   overdue: OverdueFilter;
   assigneeId: string;
   q: string;
@@ -14,7 +18,7 @@ export interface TaskFiltersValue {
 /**
  * The list filter bar. `progress` and `overdue` are TWO SEPARATE controls (docs/09 §3.5, two-axis):
  * one select for `?progress=`, one tri-state for `?overdue=`; the backend combines them AND. Progress
- * options render the enum VERBATIM (no translation layer). `hideAssignee` supports the my-tasks seam.
+ * options render friendly labels (the value stays the enum). `hideAssignee` supports the my-tasks seam.
  */
 export function TaskFilters({
   value,
@@ -35,10 +39,9 @@ export function TaskFilters({
         size="small"
         sx={{ minWidth: 160 }}
         value={value.progress}
-        SelectProps={{ displayEmpty: true }}
-        onChange={(e) => onChange({ progress: e.target.value as Progress | '' })}
+        onChange={(e) => onChange({ progress: e.target.value as Progress | 'all' })}
       >
-        <MenuItem value="">Tất cả</MenuItem>
+        <MenuItem value="all">Tất cả</MenuItem>
         {PROGRESS_VALUES.map((p) => (
           <MenuItem key={p} value={p}>
             {PROGRESS_LABELS[p]}
@@ -48,7 +51,7 @@ export function TaskFilters({
 
       <TextField
         select
-        label="Quá hạn"
+        label="Trạng thái"
         size="small"
         sx={{ minWidth: 160 }}
         value={value.overdue}
@@ -66,10 +69,9 @@ export function TaskFilters({
           size="small"
           sx={{ minWidth: 200 }}
           value={value.assigneeId}
-          SelectProps={{ displayEmpty: true }}
           onChange={(e) => onChange({ assigneeId: e.target.value })}
         >
-          <MenuItem value="">Tất cả</MenuItem>
+          <MenuItem value="all">Tất cả</MenuItem>
           {roster.map((m) => (
             <MenuItem key={m.id} value={m.id}>
               {m.name}
