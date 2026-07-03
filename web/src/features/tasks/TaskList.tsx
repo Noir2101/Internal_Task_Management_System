@@ -97,9 +97,15 @@ export function TaskList({ lockedFilter }: { lockedFilter?: { assigneeId: string
       </Box>
     );
   } else if (data.data.length === 0) {
+    // DONE + "chỉ quá hạn" is a guaranteed-empty intersection (overdue excludes DONE) — explain it
+    // instead of a generic empty message, without coupling the two independent filter axes.
+    const doneOverdueCombo =
+      filters.progress === 'DONE' && filters.overdue === 'overdue';
     content = (
       <Typography color="text.secondary" sx={{ py: 4 }}>
-        Không có công việc phù hợp.
+        {doneOverdueCombo
+          ? 'Việc đã hoàn thành không bao giờ ở trạng thái quá hạn.'
+          : 'Không có công việc phù hợp.'}
       </Typography>
     );
   } else {

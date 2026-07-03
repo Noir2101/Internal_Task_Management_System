@@ -8,6 +8,7 @@ import type { Team } from '../teams/types';
 import { userActionErrorMessage } from './error-messages';
 import { ROLE_VALUES } from './types';
 import type { CreateUserInput } from './types';
+import { ROLE_LABELS } from '../../lib/labels';
 
 /**
  * Admin create-user form (docs/09 §2.4). Zod mirrors the DTO's FORMAL rules only (docs/06 §8.1):
@@ -135,7 +136,7 @@ export function UserForm({
             <TextField {...field} select label="Vai trò" fullWidth>
               {ROLE_VALUES.map((r) => (
                 <MenuItem key={r} value={r}>
-                  {r}
+                  {ROLE_LABELS[r]}
                 </MenuItem>
               ))}
             </TextField>

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Stack, Typography } from '@mui/material';
 import { useAuth } from '../auth/useAuth';
+import { useSnackbar } from '../components/useSnackbar';
 import { TaskForm } from '../features/tasks/TaskForm';
 import { useCreateTask, useRoster } from '../features/tasks/hooks';
 import type { CreateTaskInput } from '../features/tasks/types';
@@ -10,6 +11,7 @@ import { paths } from '../routes/paths';
 export function TaskCreatePage() {
   const { identity } = useAuth();
   const navigate = useNavigate();
+  const { notify } = useSnackbar();
   const createMut = useCreateTask();
   const isLeader = identity?.role === 'LEADER';
   const { data: roster = [] } = useRoster(
@@ -30,7 +32,10 @@ export function TaskCreatePage() {
         onSubmit={async (payload) => {
           await createMut.mutateAsync(payload as CreateTaskInput);
         }}
-        onSuccess={() => navigate(paths.tasks)}
+        onSuccess={() => {
+          notify('Đã tạo công việc.', 'success');
+          navigate(paths.tasks);
+        }}
         onCancel={() => navigate(paths.tasks)}
       />
     </Stack>

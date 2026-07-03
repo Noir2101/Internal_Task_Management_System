@@ -32,6 +32,7 @@ import { useDeactivateUser, useReactivateUser, useUsers } from './hooks';
 import { userActionErrorMessage } from './error-messages';
 import { UserEditDialog } from './UserEditDialog';
 import { ROLE_VALUES } from './types';
+import { ROLE_LABELS } from '../../lib/labels';
 import type { ListUsersParams, Role, User } from './types';
 
 const LIMIT = 20;
@@ -87,7 +88,7 @@ function UserRow({ user, teamName, selfId }: { user: User; teamName: string; sel
       <TableCell>{user.name}</TableCell>
       <TableCell>{user.email}</TableCell>
       <TableCell>
-        <Chip size="small" label={user.role} color={ROLE_COLOR[user.role]} />
+        <Chip size="small" label={ROLE_LABELS[user.role]} color={ROLE_COLOR[user.role]} />
       </TableCell>
       <TableCell>{teamName}</TableCell>
       <TableCell>
@@ -255,13 +256,14 @@ export function UserList() {
             label="Vai trò"
             size="small"
             value={filters.role}
+            SelectProps={{ displayEmpty: true }}
             onChange={(e) => patchFilters({ role: e.target.value as Filters['role'] })}
             sx={{ minWidth: 160 }}
           >
             <MenuItem value="">Tất cả vai trò</MenuItem>
             {ROLE_VALUES.map((r) => (
               <MenuItem key={r} value={r}>
-                {r}
+                {ROLE_LABELS[r]}
               </MenuItem>
             ))}
           </TextField>
@@ -270,6 +272,7 @@ export function UserList() {
             label="Nhóm"
             size="small"
             value={filters.teamId}
+            SelectProps={{ displayEmpty: true }}
             onChange={(e) => patchFilters({ teamId: e.target.value })}
             sx={{ minWidth: 200 }}
           >

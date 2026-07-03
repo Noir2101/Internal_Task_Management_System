@@ -5,13 +5,13 @@ import {
   Cell,
   LabelList,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { Typography } from '@mui/material';
 import type { StatsResponse } from './types';
 import { CHART_INK, PROGRESS_COLOR, PROGRESS_ORDER } from './colors';
+import { PROGRESS_LABELS } from '../../lib/labels';
 
 /**
  * byProgress bar chart (docs/09 §2.3). EXACTLY 3 bars (TODO/IN_PROGRESS/DONE) — overdue is never a
@@ -19,7 +19,11 @@ import { CHART_INK, PROGRESS_COLOR, PROGRESS_ORDER } from './colors';
  * a direct value label; the axis names each bar, so identity is not color-alone. One measure, one axis.
  */
 export function ByProgressChart({ stats }: { stats: StatsResponse }) {
-  const data = PROGRESS_ORDER.map((k) => ({ name: k, value: stats.byProgress[k] }));
+  const data = PROGRESS_ORDER.map((k) => ({
+    key: k,
+    name: PROGRESS_LABELS[k],
+    value: stats.byProgress[k],
+  }));
 
   return (
     <>
@@ -42,11 +46,10 @@ export function ByProgressChart({ stats }: { stats: StatsResponse }) {
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip cursor={{ fill: 'rgba(11,11,11,0.04)' }} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={80} isAnimationActive={false}>
             <LabelList dataKey="value" position="top" fill={CHART_INK.primary} fontSize={12} />
             {data.map((d) => (
-              <Cell key={d.name} fill={PROGRESS_COLOR[d.name]} />
+              <Cell key={d.key} fill={PROGRESS_COLOR[d.key]} />
             ))}
           </Bar>
         </BarChart>

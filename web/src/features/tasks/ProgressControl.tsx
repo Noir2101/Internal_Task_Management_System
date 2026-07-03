@@ -4,6 +4,7 @@ import { taskActionErrorMessage } from './error-messages';
 import { useUpdateProgress } from './hooks';
 import { PROGRESS_VALUES } from './types';
 import type { Progress, Task } from './types';
+import { PROGRESS_LABELS } from '../../lib/labels';
 
 /**
  * Assignee-only progress control (docs/06 §4.3). any→any, NO state machine. The Select is controlled
@@ -36,7 +37,7 @@ export function ProgressControl({ task }: { task: Task }) {
     >
       {PROGRESS_VALUES.map((p) => (
         <MenuItem key={p} value={p}>
-          {p}
+          {PROGRESS_LABELS[p]}
         </MenuItem>
       ))}
     </TextField>

@@ -6,7 +6,7 @@
  * The app is light-only (theme.ts), so these fixed light-mode values match the app chrome.
  */
 
-/** Progress buckets in canonical order (verbatim enum — no translation layer). */
+/** Progress buckets in canonical order (enum keys; UI text comes from lib/labels.ts). */
 export const PROGRESS_ORDER = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
 export type ProgressKey = (typeof PROGRESS_ORDER)[number];
 

@@ -1,6 +1,7 @@
 import { Box, MenuItem, TextField } from '@mui/material';
 import { PROGRESS_VALUES } from './types';
 import type { OverdueFilter, Progress, RosterMember } from './types';
+import { PROGRESS_LABELS } from '../../lib/labels';
 
 /** Filter UI state. Empty string = "all" for the select-style filters. */
 export interface TaskFiltersValue {
@@ -34,12 +35,13 @@ export function TaskFilters({
         size="small"
         sx={{ minWidth: 160 }}
         value={value.progress}
+        SelectProps={{ displayEmpty: true }}
         onChange={(e) => onChange({ progress: e.target.value as Progress | '' })}
       >
         <MenuItem value="">Tất cả</MenuItem>
         {PROGRESS_VALUES.map((p) => (
           <MenuItem key={p} value={p}>
-            {p}
+            {PROGRESS_LABELS[p]}
           </MenuItem>
         ))}
       </TextField>
@@ -64,6 +66,7 @@ export function TaskFilters({
           size="small"
           sx={{ minWidth: 200 }}
           value={value.assigneeId}
+          SelectProps={{ displayEmpty: true }}
           onChange={(e) => onChange({ assigneeId: e.target.value })}
         >
           <MenuItem value="">Tất cả</MenuItem>
