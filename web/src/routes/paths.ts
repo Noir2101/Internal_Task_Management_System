@@ -8,7 +8,9 @@ export const paths = {
   taskDetail: (id: string) => `/tasks/${id}`,
   dashboard: '/dashboard',
   adminUsers: '/admin/users',
+  adminUserNew: '/admin/users/new',
   adminTeams: '/admin/teams',
+  adminTeamDetail: (id: string) => `/admin/teams/${id}`,
   forbidden: '/403',
 } as const;
 
