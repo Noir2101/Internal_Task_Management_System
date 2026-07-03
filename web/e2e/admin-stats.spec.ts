@@ -43,7 +43,7 @@ test('admin: create-user form hides team for ADMIN, requires it otherwise', asyn
 
   // Switch to ADMIN → team field disappears (ADMIN carries no teamId — anti mass-assignment).
   await page.getByLabel('Vai trò').click();
-  await page.getByRole('option', { name: 'ADMIN' }).click();
+  await page.getByRole('option', { name: 'Quản trị' }).click();
   await expect(page.getByLabel('Nhóm')).toHaveCount(0);
 });
 

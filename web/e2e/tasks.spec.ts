@@ -21,7 +21,7 @@ test('member: login → create self-assigned task → change progress', async ({
 
   // Two-axis filters are two separate controls (docs/09 §3.5).
   await expect(page.getByLabel('Tiến độ')).toBeVisible();
-  await expect(page.getByLabel('Quá hạn')).toBeVisible();
+  await expect(page.getByLabel('Trạng thái')).toBeVisible();
 
   // Create a self-assigned task (member assignee is locked to self — no picker rendered).
   await page.getByRole('link', { name: 'Tạo công việc' }).click();
@@ -37,6 +37,6 @@ test('member: login → create self-assigned task → change progress', async ({
 
   // Change progress (assignee control, any→any). Success toast confirms the write.
   await page.getByLabel('Đổi tiến độ').click();
-  await page.getByRole('option', { name: 'DONE' }).click();
+  await page.getByRole('option', { name: 'Hoàn thành' }).click();
   await expect(page.getByText('Đã cập nhật tiến độ.')).toBeVisible();
 });

@@ -212,8 +212,14 @@ web/
 ## 5. Test — mỏng, khớp thiên-backend
 
 - **Manual smoke** mỗi slice: click-through các luồng chính (login, CRUD task, filter, admin, stats).
-- **Thin Playwright happy-path (1–2 luồng):** login, tạo task, đổi progress, logout; tuỳ chọn thêm luồng
-  leader xem dashboard. Đây là tín hiệu portfolio, không phải lưới đầy đủ (backend đã có 42 e2e ở `docs/08`).
+- **Thin Playwright happy-path:** lưới thực tế là 3 spec per-slice ở `web/e2e` (`login`, `tasks`,
+  `admin-stats`): login 3 role cộng rehydrate, member task-loop, leader dashboard cộng admin form và team.
+  Đây là tín hiệu portfolio, không phải lưới đầy đủ (backend đã có 42 e2e ở `docs/08`).
+- **Chạy e2e với throttle tắt.** Suite đăng nhập nhiều lần (mỗi role một lần cộng các feature spec), vượt
+  giới hạn `/auth/login` khoảng 5 lần mỗi phút (`docs/06 §6.4`). Chạy backend kèm cờ `THROTTLE_DISABLED=true`
+  để `ThrottlerModule` (qua `skipIf`) thành pass-through, đúng analog của việc GĐ8 override ThrottlerGuard
+  cho backend e2e (`docs/08 §2`). Lệnh: `THROTTLE_DISABLED=true npm run start:dev`, rồi `cd web && npm run
+  test:e2e`. Riêng 429 vẫn verify bằng smoke tay như `docs/08 §6`.
 - KHÔNG đặt coverage-gate FE (nhất quán `docs/08 §7`).
 
 ---
