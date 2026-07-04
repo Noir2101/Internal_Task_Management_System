@@ -1,0 +1,2 @@
+# Keep shell scripts LF so the Alpine container's `sh` can run them (CRLF breaks the shebang).
+*.sh text eol=lf

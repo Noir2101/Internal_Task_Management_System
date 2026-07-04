@@ -107,6 +107,19 @@ Quy ước mỗi entry:
 
 ---
 
+## [GĐ10 Slice 1] Dockerize backend — image multi-stage + entrypoint migrate/seed-if-empty — 2026-07-04
+- Triệu chứng: (không phải bug) đóng gói backend chạy-một-lệnh (docs/10 §4/§5/§7 · chỉ config, 0 file `src/` đổi). Rủi ro: engine Prisma + native argon2 lệch nền musl khi copy `node_modules`; seed-kiểu-reset xoá data mỗi restart.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - **Runtime KHÔNG prod-only — cố ý copy NGUYÊN `node_modules` từ builder.** Entrypoint cần Prisma CLI (`migrate deploy`) + `tsx` (chạy seed `.ts`) + argon2 + `@prisma/client` đã generate; ba thứ đầu vốn là devDependency. Copy full `node_modules` (thay vì `npm ci --omit=dev`) là cách tin cậy nhất để entrypoint tự lo migrate+seed — đổi lấy image to hơn (docs/10 §4 đã cân).
+  - **`prisma generate` chạy Ở BUILDER trên CÙNG base `node:22-alpine` với runtime** ⇒ query engine `linux-musl-openssl-3.0.x` + binding argon2 khớp nền khi copy sang; runtime chỉ cần `apk add openssl`. Builder cài `python3/make/g++` để argon2 biên dịch musl. Base lệch (vd runtime slim/glibc) sẽ sinh engine sai.
+  - **seed-if-empty là guard NGOÀI seed, không sửa `seed.ts`.** `scripts/seed-if-empty.ts` import `seedDatabase` (đã export từ GĐ8) và chỉ bọc `user.count()===0` → biến seed-reset thành bước khởi động idempotent: volume mới→seed; restart→skip (giữ data user, NFR-DEPLOY-02); `down -v`→reseed (NFR-DEPLOY-03). Hành vi reset của `seed.ts` giữ nguyên.
+  - **Entrypoint đúng kỷ luật Prisma:** CHỈ `migrate deploy` (không `reset`/`db push`); `exec node dist/main` để node là PID 1 (signal sạch). Dựa vào fix `dist/main.js` của [Bước 8] (tsconfig.build exclude `prisma`) — container xác nhận `node dist/main` boot đúng. `.gitattributes *.sh eol=lf` để entrypoint không dính CRLF khi checkout trên Windows (alpine `sh` vỡ nếu CRLF).
+  - **Bug cổng build (cùng lớp [Bước 8], bắt lúc pre-flight):** thêm `scripts/seed-if-empty.ts` (một `.ts` NGOÀI `src/`) khiến `nest build` suy `rootDir` về gốc repo → xuất `dist/src/main.js` thay vì `dist/main.js` (vỡ `start:prod`) dù `nest build` exit 0. Sửa: thêm `"scripts"` vào `tsconfig.build.json#exclude` (song song `prisma` đã có) — mọi thứ trong `scripts/` chạy trực tiếp qua node/tsx/sh, `src` KHÔNG import. Container KHÔNG dính (builder copy `scripts/` sang RUNTIME, không vào tầng `nest build`) nên lỗi chỉ lộ ở build local — fix khoá cả hai đường.
+  - **Env qua compose `${VAR:-demo}` substitution:** `up` chạy ngay không cần `.env`; `.env` project-dir override. `DATABASE_URL` trỏ service host `postgres` (không phải `localhost:5433`); `JWT_ACCESS_SECRET` default là secret DEMO gắn nhãn rõ; `THROTTLE_DISABLED` KHÔNG đặt ở prod; backend KHÔNG expose host (web front-door để Slice 2). Postgres service + volume `/var/lib/postgresql` giữ nguyên (diff thuần thêm).
+- Verify (Docker thật, từ sạch): build multi-stage OK → `migrate deploy` áp `20260626123957_init` + seed (1 admin·2 nhóm·6 user·8 task) trên DB rỗng → `/api/v1/health` 200 `{status:ok}` → login `admin@demo.local` 200 + user projection `{id,name,role,teamId}` (0 leak `passwordHash`) + `Set-Cookie refresh_token; Path=/api/v1/auth; HttpOnly; Secure` (NODE_ENV=production) + header `X-RateLimit-*` (throttle sống). Restart backend → `No pending migrations` + `6 user(s) present — skipping seed`. `down` (giữ volume) → `up` → `user.count`=6. `down -v` → `up` → volume mới → reseed sạch (count 6). Cổng: lint xanh · unit 45/45 · `nest build` → `dist/main.js` (sau fix `tsconfig.build` exclude `scripts`). 0 file `src/` đổi (chỉ `tsconfig.build.json` là build-config).
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra
