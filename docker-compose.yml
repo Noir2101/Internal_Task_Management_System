@@ -46,5 +46,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # GĐ10 Slice 2 — nginx front-door. Serves the built React SPA and reverse-proxies /api to
+  # backend on ONE origin. The ONLY service published to the host (:8080). depends_on backend
+  # healthy so the proxy target is ready.
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: itms-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80" # host:container — single entry point
+    healthcheck:
+      # 127.0.0.1 not localhost: nginx listens on IPv4 only, but localhost resolves to ::1 first.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   itms_pgdata:

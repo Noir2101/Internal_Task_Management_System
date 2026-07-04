@@ -1,109 +1,122 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# ITMS — Hệ thống quản lý công việc nội bộ
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> Internal Task Management System — backend NestJS + Postgres (Prisma) và frontend React (Vite),
+> đóng gói chạy bằng **một lệnh** Docker Compose. Toàn bộ chạy same-origin sau một cửa trước nginx.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Chạy bằng một lệnh
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+Yêu cầu: Docker Desktop (hoặc Docker Engine + Compose v2).
 
 ```bash
-$ npm install
+docker compose up -d --build
 ```
 
-## Compile and run the project
+Lần đầu, container backend tự **migrate** rồi **seed dữ liệu mẫu** (chỉ khi DB rỗng). Khi cả ba
+container khoẻ, mở:
+
+- Ứng dụng: **http://localhost:8080**
+- API docs (Swagger): **http://localhost:8080/api/v1/docs**
+
+Tài khoản seed (mật khẩu chung `Password123!`):
+
+| Email | Vai trò | Nhóm |
+|---|---|---|
+| `admin@demo.local` | ADMIN | — |
+| `be.lead@demo.local` | LEADER | Backend |
+| `be.a@demo.local` · `be.b@demo.local` | MEMBER | Backend |
+| `fe.lead@demo.local` | LEADER | Frontend |
+| `fe.a@demo.local` | MEMBER | Frontend |
+
+Dừng / dọn:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker compose down       # dừng, GIỮ dữ liệu (volume còn) — up lại là chạy tiếp
+docker compose down -v    # dừng và XOÁ volume → lần up sau seed lại từ đầu
 ```
 
-## API docs (Swagger)
+Dữ liệu bền qua restart nhờ volume `itms_pgdata`; seed có guard `user.count()==0` nên restart không
+ghi đè dữ liệu bạn tạo (chi tiết `docs/10-deploy-plan.md` §5).
 
-Interactive OpenAPI docs are served at **`/api/v1/docs`** (generated from DTO decorators —
-contract source: `docs/06-api-contract.md`). Use the **Authorize** button to paste an access token
-and call endpoints; the refresh-token cookie is `httpOnly` so the refresh flow can't be exercised
-from Swagger (test it via curl or the frontend).
+---
 
-> **Note (demo choice).** Swagger is left **open** here so reviewers can explore the API. In a real
-> production deployment this should be gated behind an environment flag — open API docs are not a
-> safe default for prod (docs/06 §11 "cổng prod").
+## Kiến trúc
 
-## Run tests
+Ba container trên một mạng nội bộ. Chỉ nginx lộ cổng ra host; backend và Postgres không expose ra
+ngoài. Trình duyệt chỉ thấy một origin (`http://localhost:8080`) nên cookie refresh (`Path=/api/v1/auth`)
+gửi đúng chỗ và không dính CORS.
+
+```
+                 host :8080
+                     │
+        ┌────────────▼────────────┐
+        │   web  (nginx:alpine)   │   front-door
+        │  /       → SPA (dist)   │   (serve static)
+        │  /api/*  → backend:3000 │   (reverse-proxy, KHÔNG rewrite path)
+        └────────────┬────────────┘
+                     │  mạng nội bộ itms
+        ┌────────────▼────────────┐
+        │  backend (node:22)      │   NestJS, prefix /api/v1
+        │  entrypoint: migrate    │   → seed-if-empty → node dist/main
+        └────────────┬────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │  postgres:18            │   volume itms_pgdata → /var/lib/postgresql
+        └─────────────────────────┘
+```
+
+**Stack:** NestJS · Prisma · PostgreSQL 18 · argon2 (backend) — React · Vite · TypeScript · MUI ·
+TanStack Query · React Router · Recharts (frontend).
+
+---
+
+## Tài liệu kỹ thuật (tóm tắt)
+
+### Schema
+Bốn model: `User`, `Team`, `Task`, `RefreshToken`. Điểm chính:
+- Admin đứng ngoài cây tổ chức (`teamId` NULL); leader/member thuộc đúng một nhóm.
+- Task có `owner` và `assignee` (một assignee cá nhân); **không** có cột `teamId` — phạm vi suy từ
+  nhóm của assignee.
+- **OVERDUE là computed** (`deadline < now AND progress != DONE`), không phải cột hay trạng thái thứ tư.
+- User dùng `isActive` (đảo được); Task dùng `deletedAt` (tombstone).
+
+Nguồn đầy đủ: [`docs/05-data-schema.md`](docs/05-data-schema.md) · [`prisma/schema.prisma`](prisma/schema.prisma) · phân tích nghiệp vụ [`docs/01-business-analysis.md`](docs/01-business-analysis.md).
+
+### Quyết định chính
+- **Hợp đồng API đông cứng** — mọi lỗi trả cùng một envelope `{statusCode,error,code,message,…}`;
+  FE rẽ nhánh chỉ trên `code`. Xem [`docs/06-api-contract.md`](docs/06-api-contract.md).
+- **Phân quyền keystone** — phạm vi suy từ JWT (`teamId`), client không gửi scope; ngoài phạm vi →
+  404 (giấu tồn tại), sai quyền trong phạm vi → 403; record-level qua `TaskPolicy`.
+- **Kiến trúc hexagonal ở module Tasks** (domain thuần, port/adapter) — xem [`src/tasks/CLAUDE.md`](src/tasks/CLAUDE.md).
+- **Triển khai** — nginx front-door giữ same-origin (không chạm mã backend); entrypoint
+  `migrate deploy → seed-if-empty → node dist/main`. Xem [`docs/10-deploy-plan.md`](docs/10-deploy-plan.md).
+
+Bản đồ tài liệu — hợp đồng: [`docs/01-business-analysis.md`](docs/01-business-analysis.md) ·
+[`02-requirements.md`](docs/02-requirements.md) · [`04-architecture.md`](docs/04-architecture.md) ·
+[`05-data-schema.md`](docs/05-data-schema.md) · [`06-api-contract.md`](docs/06-api-contract.md).
+Kế hoạch: [`07-build-plan.md`](docs/07-build-plan.md) · [`08-test-plan.md`](docs/08-test-plan.md) ·
+[`09-frontend-plan.md`](docs/09-frontend-plan.md) · [`10-deploy-plan.md`](docs/10-deploy-plan.md).
+
+### Ghi chú demo
+- **Swagger để mở** ở `/api/v1/docs` cho người chấm khám phá API — đây là lựa chọn demo có chủ đích;
+  prod nên gate sau một cờ môi trường (docs/06 §11).
+- **Throttle bật** ở prod (login ~5 lần/phút/IP); `THROTTLE_DISABLED` chỉ dành cho e2e, không đặt ở đây.
+- **Cookie `Secure`** bật (`NODE_ENV=production`) và vẫn chạy qua `http://localhost` vì `localhost` là
+  secure-context. Truy cập qua IP LAN nằm ngoài phạm vi demo.
+- Bí mật đi qua biến môi trường (xem [`.env.example`](.env.example)); giá trị mặc định trong compose là
+  secret **DEMO**, override bằng `.env` tại chỗ khi cần.
+
+---
+
+## Phát triển (không Docker)
 
 ```bash
-# unit tests
-$ npm run test
+# Backend (cần Postgres — có thể dùng `docker compose up -d postgres`)
+cp .env.example .env        # điền DATABASE_URL + JWT_ACCESS_SECRET
+npm install
+npm run start:dev           # http://localhost:3000/api/v1
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Frontend (đề xuất chạy song song; Vite proxy /api → :3000)
+cd web && npm install && npm run dev   # http://localhost:5173
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

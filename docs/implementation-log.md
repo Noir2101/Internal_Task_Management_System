@@ -120,6 +120,17 @@ Quy ước mỗi entry:
 
 ---
 
+## [GĐ10 Slice 2] Front-door nginx — SPA + reverse-proxy /api + healthcheck IPv6 gotcha — 2026-07-04
+- Triệu chứng: (config) dựng cửa trước same-origin cho FE tĩnh + proxy `/api` (docs/10 §6). Verify bắt 1 bug thật ở healthcheck container `web`.
+- Bug (đáng nhớ): healthcheck `wget -qO- http://localhost:80/` trong container `web` báo **unhealthy** dù nginx serve OK từ host. Nguyên nhân gốc: `listen 80;` của nginx chỉ IPv4 (0.0.0.0), nhưng `localhost` trong alpine resolve `::1` (IPv6) TRƯỚC → "connection refused"; `127.0.0.1` chạy. (Backend healthcheck dùng `localhost` vẫn OK vì Node bind dual-stack.) Sửa: healthcheck `web` trỏ `http://127.0.0.1/`.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - **nginx front-door, KHÔNG chạm mã backend** (docs/10 §3): `proxy_pass http://backend:3000;` KHÔNG dấu `/` cuối → giữ nguyên URI (cả prefix `/api/v1`). Giữ prefix ⇒ cookie refresh `Path=/api/v1/auth` gửi đúng + Swagger `/api/v1/docs` qua cùng cửa. Forward `X-Forwarded-For/-Proto` cho backend `trust proxy:1` (throttle key IP thật). `try_files $uri /index.html` cho SPA fallback (React Router).
+  - **web build context = `./web`** (docs §9 hai context); serve stage `nginx:alpine` copy `dist`→`/usr/share/nginx/html` + `nginx.conf`→`conf.d/default.conf`. FE api-client `baseURL:'/api/v1'` (same-origin) nên KHÔNG cần build-arg `VITE_*`.
+  - **web là service DUY NHẤT expose host** (`8080:80`); backend/postgres nội bộ. `depends_on backend: service_healthy` (dùng healthcheck backend từ Slice 1).
+- Verify (Docker thật, full stack từ `down -v`): 3 container healthy → `curl :8080/` trả SPA (`<div id="root">` + `/assets/*.js`) → `:8080/api/v1/health` `{status:ok}` (proxy) → login qua `:8080` 200 + `Set-Cookie refresh_token; Path=/api/v1/auth; HttpOnly; Secure` (same-origin cookie giữ) → 8 login dồn dập `200×4 → 429×4` (throttle prod ON, `THROTTLE_DISABLED` unset) → `:8080/api/v1/docs` 200 Swagger UI → `:8080/tasks` deep-link trả `index.html` (SPA fallback) → restart backend: seed skip, user=6/task=8 giữ nguyên, login lại 200 (throttle in-mem reset). README viết lại (VN, DOC-02/03). 0 file `src/` đổi.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra
