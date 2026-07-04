@@ -1,0 +1,29 @@
+# Backend build context — GĐ10 Slice 1 (docs/10-deploy-plan.md §9).
+# Keep the context small and keep secrets out of the image. Everything the builder COPYs
+# (package*.json, prisma/, src/, scripts/, tsconfig*, nest-cli.json) is retained.
+
+node_modules
+dist
+build
+coverage
+
+.git
+.gitignore
+.gitattributes
+
+# Secrets: never copy a real .env into the image (.env.example is not copied anyway).
+.env
+.env.*
+
+# Frontend + tests + docs are not part of the backend image.
+web/
+test/
+docs/
+*.md
+
+# Editor / tooling / deploy config (not needed in the image).
+.vscode/
+.idea/
+Dockerfile
+.dockerignore
+docker-compose.yml

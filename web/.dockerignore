@@ -1,0 +1,18 @@
+# Frontend build context — GĐ10 Slice 2 (docs/10-deploy-plan.md §9).
+# Keep the context small; the build stage COPYs the rest (src, index.html, tsconfig*,
+# vite.config.ts, package*.json, public/) and the serve stage COPYs nginx.conf.
+
+node_modules
+dist
+
+# Playwright e2e + artifacts (not part of the production image).
+e2e
+test-results
+playwright-report
+
+# Incremental build state (tsc -b rebuilds fresh in the container).
+*.tsbuildinfo
+
+.git
+Dockerfile
+.dockerignore

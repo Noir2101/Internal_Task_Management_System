@@ -19,5 +19,53 @@ services:
       timeout: 5s
       retries: 10
 
+  # GĐ10 Slice 1 — backend image (Dockerfile). Entrypoint: migrate deploy → seed-if-empty →
+  # node dist/main. NOT exposed to host (web front-door lands in Slice 2). Env uses ${VAR:-demo}
+  # substitution so `up` works with no .env; a project-dir .env overrides. DATABASE_URL is the
+  # internal service host `postgres` (not a secret — mirrors the pg creds above).
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: itms-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://itms:itms@postgres:5432/itms?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-demo-only-not-a-real-secret-change-me}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      REFRESH_TTL_DAYS: ${REFRESH_TTL_DAYS:-7}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # GĐ10 Slice 2 — nginx front-door. Serves the built React SPA and reverse-proxies /api to
+  # backend on ONE origin. The ONLY service published to the host (:8080). depends_on backend
+  # healthy so the proxy target is ready.
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: itms-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80" # host:container — single entry point
+    healthcheck:
+      # 127.0.0.1 not localhost: nginx listens on IPv4 only, but localhost resolves to ::1 first.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   itms_pgdata:
