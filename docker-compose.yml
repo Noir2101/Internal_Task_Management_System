@@ -39,6 +39,12 @@ services:
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       REFRESH_TTL_DAYS: ${REFRESH_TTL_DAYS:-7}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
     healthcheck:
       test:
         ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/health || exit 1"]

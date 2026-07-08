@@ -28,7 +28,7 @@ export function ByProgressChart({ stats }: { stats: StatsResponse }) {
   return (
     <>
       <Typography variant="h6" gutterBottom>
-        Tiến độ — số lượng
+        Theo tiến độ
       </Typography>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} margin={{ top: 20, right: 16, bottom: 4, left: 0 }}>

@@ -5,8 +5,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
-  Link as MuiLink,
   MenuItem,
   Paper,
   Stack,
@@ -93,9 +91,13 @@ export function TeamDetailView({ teamId }: { teamId: string }) {
   return (
     <Stack spacing={3}>
       <Box>
-        <MuiLink component={RouterLink} to={paths.adminTeams} underline="hover" variant="body2">
-          ← Danh sách nhóm
-        </MuiLink>
+        <Button
+        component={RouterLink}
+        to={paths.adminTeams}
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        ← Danh sách nhóm
+      </Button>
         <Typography variant="h4" component="h1" sx={{ mt: 1 }}>
           {team.name}
         </Typography>
@@ -147,7 +149,7 @@ export function TeamDetailView({ teamId }: { teamId: string }) {
           Đổi trưởng nhóm
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Chọn một thành viên đang hoạt động để giao vai trò trưởng nhóm (hoán đổi nguyên tử).
+          Chọn một thành viên đang hoạt động để giao vai trò trưởng nhóm, trưởng nhóm hiện tại sẽ trở thành thành viên.
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
           <TextField
@@ -187,10 +189,8 @@ export function TeamDetailView({ teamId }: { teamId: string }) {
           Giải thể nhóm
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Chỉ dùng khi khẩn cấp (break-glass). Chỉ giải thể được nhóm chưa từng có thành viên — nếu còn
-          thành viên (kể cả đã vô hiệu) sẽ báo lỗi.
+          Chỉ có thể giải thể nhóm không còn thành viên.
         </Typography>
-        <Divider sx={{ mb: 2 }} />
         <Button color="error" variant="outlined" onClick={() => setConfirmDelete(true)}>
           Giải thể nhóm này
         </Button>

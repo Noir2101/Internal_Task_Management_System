@@ -115,8 +115,8 @@ export function TaskDetail({ id }: { id: string }) {
           <Divider sx={{ my: 2 }} />
 
           <Stack spacing={1}>
-            <Field label="Người giao (owner)" value={task.owner.name} />
-            <Field label="Người được giao (assignee)" value={task.assignee.name} />
+            <Field label="Người giao" value={task.owner.name} />
+            <Field label="Người được giao" value={task.assignee.name} />
             <Field label="Hạn chót" value={formatDateTime(task.deadline)} />
             <Field label="Tạo lúc" value={formatDateTime(task.createdAt)} />
             <Field label="Cập nhật" value={formatDateTime(task.updatedAt)} />

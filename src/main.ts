@@ -14,9 +14,8 @@ async function bootstrap(): Promise<void> {
   const config = new DocumentBuilder()
     .setTitle('Internal Task Management System API')
     .setDescription(
-      'ITMS backend — GĐ7. Hợp đồng: docs/06-api-contract.md. Mọi lỗi trả về cùng một ' +
-        'envelope (model `ErrorEnvelopeResponse`); FE rẽ nhánh trên `code` (registry §7.3). ' +
-        'Lưu ý: Swagger để mở ở đây là lựa chọn DEMO — prod nên gate sau cờ môi trường (§11).',
+      'ITMS backend. Mọi lỗi trả về cùng một ' +
+        'envelope (model `ErrorEnvelopeResponse`); frontend rẽ nhánh trên `code`.',
     )
     .setVersion('1.0')
     .addBearerAuth()

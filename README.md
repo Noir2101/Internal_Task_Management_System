@@ -37,7 +37,7 @@ docker compose down -v    # dừng và XOÁ volume → lần up sau seed lại t
 ```
 
 Dữ liệu bền qua restart nhờ volume `itms_pgdata`; seed có guard `user.count()==0` nên restart không
-ghi đè dữ liệu bạn tạo (chi tiết `docs/10-deploy-plan.md` §5).
+ghi đè dữ liệu bạn tạo.
 
 ---
 
@@ -81,27 +81,19 @@ Bốn model: `User`, `Team`, `Task`, `RefreshToken`. Điểm chính:
 - **OVERDUE là computed** (`deadline < now AND progress != DONE`), không phải cột hay trạng thái thứ tư.
 - User dùng `isActive` (đảo được); Task dùng `deletedAt` (tombstone).
 
-Nguồn đầy đủ: [`docs/05-data-schema.md`](docs/05-data-schema.md) · [`prisma/schema.prisma`](prisma/schema.prisma) · phân tích nghiệp vụ [`docs/01-business-analysis.md`](docs/01-business-analysis.md).
-
 ### Quyết định chính
 - **Hợp đồng API đông cứng** — mọi lỗi trả cùng một envelope `{statusCode,error,code,message,…}`;
-  FE rẽ nhánh chỉ trên `code`. Xem [`docs/06-api-contract.md`](docs/06-api-contract.md).
+  frontend rẽ nhánh chỉ trên `code`.
 - **Phân quyền keystone** — phạm vi suy từ JWT (`teamId`), client không gửi scope; ngoài phạm vi →
   404 (giấu tồn tại), sai quyền trong phạm vi → 403; record-level qua `TaskPolicy`.
-- **Kiến trúc hexagonal ở module Tasks** (domain thuần, port/adapter) — xem [`src/tasks/CLAUDE.md`](src/tasks/CLAUDE.md).
+- **Kiến trúc hexagonal ở module Tasks** (domain thuần, port/adapter).
 - **Triển khai** — nginx front-door giữ same-origin (không chạm mã backend); entrypoint
-  `migrate deploy → seed-if-empty → node dist/main`. Xem [`docs/10-deploy-plan.md`](docs/10-deploy-plan.md).
-
-Bản đồ tài liệu — hợp đồng: [`docs/01-business-analysis.md`](docs/01-business-analysis.md) ·
-[`02-requirements.md`](docs/02-requirements.md) · [`04-architecture.md`](docs/04-architecture.md) ·
-[`05-data-schema.md`](docs/05-data-schema.md) · [`06-api-contract.md`](docs/06-api-contract.md).
-Kế hoạch: [`07-build-plan.md`](docs/07-build-plan.md) · [`08-test-plan.md`](docs/08-test-plan.md) ·
-[`09-frontend-plan.md`](docs/09-frontend-plan.md) · [`10-deploy-plan.md`](docs/10-deploy-plan.md).
+  `migrate deploy → seed-if-empty → node dist/main`.
 
 ### Ghi chú demo
-- **Swagger để mở** ở `/api/v1/docs` cho người chấm khám phá API — đây là lựa chọn demo có chủ đích;
-  prod nên gate sau một cờ môi trường (docs/06 §11).
-- **Throttle bật** ở prod (login ~5 lần/phút/IP); `THROTTLE_DISABLED` chỉ dành cho e2e, không đặt ở đây.
+- **Swagger để mở** ở `/api/v1/docs` chỉ để demo;
+  prod nên gate sau một cờ môi trường.
+- **Throttle bật** ở prod (login ~5 lần/phút/IP); `THROTTLE_DISABLED` chỉ dành cho e2e.
 - **Cookie `Secure`** bật (`NODE_ENV=production`) và vẫn chạy qua `http://localhost` vì `localhost` là
   secure-context. Truy cập qua IP LAN nằm ngoài phạm vi demo.
 - Bí mật đi qua biến môi trường (xem [`.env.example`](.env.example)); giá trị mặc định trong compose là

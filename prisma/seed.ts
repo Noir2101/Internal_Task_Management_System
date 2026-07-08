@@ -63,20 +63,20 @@ export async function seedDatabase(
 
   // Mỗi nhóm đúng 1 LEADER (partial unique) + member
   const beLead = await mkUser(
-    'be.lead@demo.local',
-    'Bích (BE lead)',
+    'huy.hoangkhang21@gmail.com',
+    'Huy',
     Role.LEADER,
     backend.id,
   );
-  const beA = await mkUser('be.a@demo.local', 'An (BE)', Role.MEMBER, backend.id);
-  const beB = await mkUser('be.b@demo.local', 'Bảo (BE)', Role.MEMBER, backend.id);
+  const beA = await mkUser('be.a@demo.local', 'An', Role.MEMBER, backend.id);
+  const beB = await mkUser('be.b@demo.local', 'Bảo', Role.MEMBER, backend.id);
   const feLead = await mkUser(
     'fe.lead@demo.local',
-    'Linh (FE lead)',
+    'Linh',
     Role.LEADER,
     frontend.id,
   );
-  const feA = await mkUser('fe.a@demo.local', 'Hà (FE)', Role.MEMBER, frontend.id);
+  const feA = await mkUser('fe.a@demo.local', 'Hà', Role.MEMBER, frontend.id);
 
   const mkTask = (data: {
     title: string;

@@ -61,9 +61,9 @@ function UserRow({ user, teamName, selfId }: { user: User; teamName: string; sel
 
   const runDeactivate = async () => {
     try {
-      const res = await deactivateMut.mutateAsync();
+      await deactivateMut.mutateAsync();
       notify(
-        `Đã vô hiệu hoá "${user.name}". Số công việc mồ côi: ${res.orphanedTaskCount}.`,
+        `Đã vô hiệu hoá "${user.name}".`,
         'success',
       );
     } catch (err) {
@@ -127,7 +127,7 @@ function UserRow({ user, teamName, selfId }: { user: User; teamName: string; sel
       <ConfirmDialog
         open={confirm === 'deactivate'}
         title="Vô hiệu hoá người dùng"
-        message={`Vô hiệu hoá "${user.name}"? Refresh token của họ sẽ bị thu hồi.`}
+        message={`Vô hiệu hoá "${user.name}"?`}
         confirmLabel="Vô hiệu hoá"
         confirmColor="error"
         loading={deactivateMut.isPending}
