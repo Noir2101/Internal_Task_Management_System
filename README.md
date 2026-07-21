@@ -112,3 +112,9 @@ npm run start:dev           # http://localhost:3000/api/v1
 # Frontend (đề xuất chạy song song; Vite proxy /api → :3000)
 cd web && npm install && npm run dev   # http://localhost:5173
 ```
+
+---
+
+## Lịch sử
+
+Tường thuật các giai đoạn build (GĐ1–10) ở [`CHANGELOG.md`](CHANGELOG.md); luật/bất biến kiến trúc ở [`CLAUDE.md`](CLAUDE.md), spine đầy đủ ở `docs/00–06`.
