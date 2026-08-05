@@ -19,7 +19,7 @@ Tiêu chí phân loại không phải "quan trọng hay không" mà là **"DB c�
 
 ## 1. Thực thể, thuộc tính & quyết định toàn cục
 
-Bốn thực thể: **User, Team, Task, RefreshToken** (đúng Phần D GĐ2 — *không* bảng `audit_logs` ở bản nộp). Hai enum native PG: `Role {ADMIN, LEADER, MEMBER}`, `Progress {TODO, IN_PROGRESS, DONE}`.
+Bốn thực thể: **User, Team, Task, RefreshToken** (đúng Phần D GĐ2 — *không* bảng `audit_logs` ở bản v1). Hai enum native PG: `Role {ADMIN, LEADER, MEMBER}`, `Progress {TODO, IN_PROGRESS, DONE}`.
 
 Bốn quyết định cấp-schema áp cho mọi bảng, mỗi cái kèm lý do:
 
@@ -361,4 +361,4 @@ Là nguồn tham chiếu cho:
 - **Giai đoạn 6 — API contract:** endpoint/DTO; nơi áp guard + `TaskPolicy` record-level; envelope lỗi field-level.
 - **Giai đoạn 7 — Code:** `schema.prisma` + migration (§9–§10) đã sẵn; *hiện thực* các invariant đã-chỉ-định-domain ở #3/#4/#7 (giao-trong-nhóm, ownership, thay-leader atomic, thuật toán rotation/reuse-detection). Schema đã đỡ đủ — không quyết định nào ở GĐ5 cản đường.
 
-> **Ghi chú phương pháp:** tài liệu cố tình ghi *lựa chọn + đánh đổi + lý do* cho từng quyết định lớn (derive-leader thay vì leader_id, split soft-delete, SHA-256 thay vì bcrypt cho token, index theo join vì derive-scope, raw-SQL cho CHECK/partial-index). Đây là phần **bảo vệ trước giảng viên** và **kể chuyện phỏng vấn** — đặc biệt câu "anh thiết kế schema thế nào để vừa production-grade vừa không over-engineer ở đồ án 23 ngày".
+> **Ghi chú phương pháp:** tài liệu cố tình ghi *lựa chọn + đánh đổi + lý do* cho từng quyết định lớn (derive-leader thay vì leader_id, split soft-delete, SHA-256 thay vì bcrypt cho token, index theo join vì derive-scope, raw-SQL cho CHECK/partial-index). Đây là phần **kể chuyện phỏng vấn** — đặc biệt câu "anh thiết kế schema thế nào để vừa production-grade vừa không over-engineer ở dự án ~3 tuần".

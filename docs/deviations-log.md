@@ -215,7 +215,7 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 - Loại: phụ-lục-vĩnh-viễn (tính năng bonus NGOÀI hợp đồng đông cứng — KHÔNG đẻ code/status/field FE-observable; §9.3 đã tiên liệu seam Noop→Email)
 - Trạng thái: mở (không hạn đóng)
 - Vị trí: src/tasks/infrastructure/email-notifier.ts · src/tasks/infrastructure/mail-transport.ts · src/tasks/tasks.module.ts (factory NOTIFIER theo env) · src/tasks/application/ports/notifier.port.ts (`notifyAssigned`) · src/tasks/application/create-task.usecase.ts (hook) · .env.example · docs/07.A-notifications.md
-- Hợp đồng nói gì: §9.3 "phát qua `Notifier`, NoopNotifier bản nộp, EmailNotifier portfolio, báo assignee mới / báo leader"; §6.4 quy ước cấu hình qua env + gate theo cờ. IM LẶNG: provider/transport cụ thể, tên biến env, nội dung email, cơ chế nuốt lỗi, và hook lúc CREATE (chỉ nói reassign + orphaned).
+- Hợp đồng nói gì: §9.3 "phát qua `Notifier`, NoopNotifier bản v1, EmailNotifier portfolio, báo assignee mới / báo leader"; §6.4 quy ước cấu hình qua env + gate theo cờ. IM LẶNG: provider/transport cụ thể, tên biến env, nội dung email, cơ chế nuốt lỗi, và hook lúc CREATE (chỉ nói reassign + orphaned).
 - Quyết định (đã duyệt plan-mode AskUserQuestion — Luật số 0):
   - **Transport:** nodemailer làm lớp chung; provider prod = Resend qua SMTP (`smtp.resend.com`). Đổi provider = đổi env `SMTP_*`, không đổi code. Gate bằng cờ `MAIL_ENABLED` (false → NoopNotifier mặc-định-offline; true → EmailNotifier). Fail-fast lúc init nếu bật mà thiếu `SMTP_*`/`MAIL_FROM`.
   - **Tên env:** `MAIL_ENABLED`, `MAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`. Chỉ ở `.env` (gitignore); `.env.example` chỉ placeholder.

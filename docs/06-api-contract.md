@@ -62,7 +62,7 @@ Các quy ước dưới đây áp cho mọi endpoint. Nêu một lần ở đây
 | Enum | Giữ y nguyên giá trị enum của database | `TODO`, `IN_PROGRESS`, `DONE`, `ADMIN`, `LEADER`, `MEMBER`. Không có lớp dịch. Frontend và backend dùng chung từ vựng. |
 | Triển khai | same-origin | Vite proxy lúc dev, reverse-proxy lúc prod. Giữ cookie sạch, tránh CORS. |
 
-Ghi chú về versioning. Giai đoạn 4 mục 8.5 đã hoãn việc làm versioning khỏi bản nộp. Quyết định ở đây không nghịch điều đó. `/api/v1` chỉ là một tiền tố tĩnh để dành chỗ. Nó khác một chiến lược versioning thật, vốn cần đàm phán content-negotiation và chính sách ngừng hỗ trợ phiên bản cũ. Thêm prefix thì rẻ và không cam kết gì thêm.
+Ghi chú về versioning. Giai đoạn 4 mục 8.5 đã hoãn việc làm versioning khỏi bản v1. Quyết định ở đây không nghịch điều đó. `/api/v1` chỉ là một tiền tố tĩnh để dành chỗ. Nó khác một chiến lược versioning thật, vốn cần đàm phán content-negotiation và chính sách ngừng hỗ trợ phiên bản cũ. Thêm prefix thì rẻ và không cam kết gì thêm.
 
 ---
 
@@ -465,7 +465,7 @@ Việc đầu tiên là vạch sắc ranh giới giữa thao tác routine và th
 - **Routine, thuộc trục chức năng.** Admin quản user và team của chính cấu trúc tổ chức. Ví dụ tạo user, gán leader, vô hiệu hoá user. Guard là vai trò admin. Phạm vi là toàn hệ thống. Không ghi log break-glass. Ở đây admin vẫn không chạm vào dữ liệu task.
 - **Break-glass, là cứu hộ.** Admin với tay vào chỗ vốn bị chặn, ví dụ dữ liệu task hoặc việc giải thể nhóm. Thao tác này có tính phá huỷ hoặc vượt invariant. Mỗi lần gọi đều ghi một dòng log ứng dụng gồm actor, action, target, và thời điểm, ra stdout. Đây là mầm của một audit-log đầy đủ ở phiên bản portfolio, theo MAINT-05. Nó không phải audit-log.
 
-Phần lớn mục này là routine. Break-glass thật trong bản nộp cố tình mỏng. Giá trị của nó là cái seam để sẵn cộng với quy ước ghi log, không phải một bảng điều khiển toàn quyền. Ở đây "seam" nghĩa là một đường cắt để sẵn, hoãn được, thêm sau mà không phải mổ lại lõi.
+Phần lớn mục này là routine. Break-glass thật trong bản v1 cố tình mỏng. Giá trị của nó là cái seam để sẵn cộng với quy ước ghi log, không phải một bảng điều khiển toàn quyền. Ở đây "seam" nghĩa là một đường cắt để sẵn, hoãn được, thêm sau mà không phải mổ lại lõi.
 
 ### 9.2. Surface routine
 
@@ -495,7 +495,7 @@ Cái đẹp của endpoint này là nó cũng là lời giải cho việc chặn
 
 > Đây là lý do không cho sửa `role` tự do qua `PATCH /users/:id`. Mọi chuyển đổi giữa LEADER và MEMBER chỉ xảy ra như hệ quả của việc đặt leader, không bao giờ là một lệnh trực tiếp. Nhờ vậy không có cách nào tạo trạng thái 0 leader hay 2 leader từ hợp đồng.
 
-**`POST /users/:id/deactivate` đóng ca FR-USER-01.** Khi đối tượng là member, trả 200 kèm `orphanedTaskCount`, để admin thấy ngay trên giao diện. Đồng thời phát một thông báo qua port `Notifier`, là `NoopNotifier` ở bản nộp và `EmailNotifier` ở portfolio, để báo leader. Task treo giữ nguyên `assigneeId` nên phạm vi vẫn ổn, và task nằm lại trong nhóm. Leader tìm chúng bằng `GET /tasks?assigneeId=<member>` rồi reassign bằng `PATCH /tasks/:id/assignee`, vốn là quyền của leader theo keystone. Khi đối tượng là leader thì trả 409, không phát thông báo gì.
+**`POST /users/:id/deactivate` đóng ca FR-USER-01.** Khi đối tượng là member, trả 200 kèm `orphanedTaskCount`, để admin thấy ngay trên giao diện. Đồng thời phát một thông báo qua port `Notifier`, là `NoopNotifier` ở bản v1 và `EmailNotifier` ở portfolio, để báo leader. Task treo giữ nguyên `assigneeId` nên phạm vi vẫn ổn, và task nằm lại trong nhóm. Leader tìm chúng bằng `GET /tasks?assigneeId=<member>` rồi reassign bằng `PATCH /tasks/:id/assignee`, vốn là quyền của leader theo keystone. Khi đối tượng là leader thì trả 409, không phát thông báo gì.
 
 ```jsonc
 // POST /users/:id/deactivate khi đối tượng là member
@@ -509,9 +509,9 @@ Cái đẹp của endpoint này là nó cũng là lời giải cho việc chặn
 
 Hai edge nên chặn để xứng production. Không cho admin vô hiệu hoá chính mình. Không cho vô hiệu hoá admin cuối cùng. Hai ca này trả 409 `CANNOT_DISABLE_SELF` và `LAST_ADMIN`. Việc này chống tự khoá hệ thống, và rất rẻ.
 
-### 9.4. Break-glass trong bản nộp
+### 9.4. Break-glass trong bản v1
 
-Bản nộp có đúng một endpoint break-glass, để demo cái seam.
+Bản v1 có đúng một endpoint break-glass, để demo cái seam.
 
 | Endpoint | Hành vi | Lỗi |
 |---|---|---|
@@ -523,7 +523,7 @@ Bản nộp có đúng một endpoint break-glass, để demo cái seam.
 
 Log thể hiện trong hợp đồng thế nào. Log là một side-effect nên không phải một field trong response. Nó là một hành vi được khai báo. Phần mô tả của endpoint trong OpenAPI ghi cảnh báo là endpoint này ghi một dòng log ứng dụng gồm actor, action, target, thời điểm, và nó nằm ngoài policy thường. Đó là cách một side-effect xuất hiện trong hợp đồng ở Giai đoạn 6.
 
-Cố tình không có trong bản nộp: admin sửa task tuỳ ý, và các thao tác chỉnh dữ liệu tổng quát. Hai thứ này để dành portfolio. Xây chúng bây giờ đúng là tạo ra super-manager ngầm mà mục 5 cảnh báo. Cái seam, gồm một nhánh chỉ-admin cộng một interceptor ghi log, đã đủ để chứng minh.
+Cố tình không có trong bản v1: admin sửa task tuỳ ý, và các thao tác chỉnh dữ liệu tổng quát. Hai thứ này để dành portfolio. Xây chúng bây giờ đúng là tạo ra super-manager ngầm mà mục 5 cảnh báo. Cái seam, gồm một nhánh chỉ-admin cộng một interceptor ghi log, đã đủ để chứng minh.
 
 ### 9.5. Nhóm và vai trò bất biến sau khi tạo
 
@@ -583,7 +583,7 @@ Các quyết định setup.
 - **Bắt buộc có example ở bốn chỗ khó.** Bốn chỗ này không map một-một với model, nên chúng đúng là chỗ cần chứng minh hình dạng hợp đồng khác hình dạng model. Đó là cờ `overdue` trong task, hình dạng stats ở mục 5, mảng `details` của lỗi validation, và envelope lỗi. Dùng `@ApiProperty` tường minh cho field computed và field lồng.
 - **Tags gom theo context.** Gồm auth, tasks, users, teams, stats.
 - **Endpoint break-glass.** Phần mô tả gắn cảnh báo là endpoint này ghi một dòng log ứng dụng gồm actor, action, target, thời điểm. Đây là cách side-effect log hiện trong hợp đồng.
-- **Cổng prod.** Chuẩn production là ẩn Swagger sau một cờ môi trường. Với đồ án này thì để mở, vì người chấm cần truy cập. README cần nói rõ đây là một lựa chọn để demo, không phải mặc định cho prod. Việc nói rõ này là một tín hiệu cho thấy biết cái gì không nên hở ở prod.
+- **Cổng prod.** Chuẩn production là ẩn Swagger sau một cờ môi trường. Với dự án này thì để mở, vì người chạy thử cần truy cập. README cần nói rõ đây là một lựa chọn để demo, không phải mặc định cho prod. Việc nói rõ này là một tín hiệu cho thấy biết cái gì không nên hở ở prod.
 
 > Spec này cộng toàn bộ tài liệu Giai đoạn 6 là input đông cứng cho Giai đoạn 7. Mỗi endpoint đã có verb, path, DTO, code, và policy cần thoả. Giai đoạn 7 chỉ hiện thực guard, policy, và use-case đã được trỏ tên, không phát minh thêm hợp đồng.
 
@@ -623,4 +623,4 @@ Hai quyết định dưới đây nằm ở chỗ Giai đoạn 1 và 2 để ng�
 
 Tài liệu này là hợp đồng đông cứng. Giai đoạn 7 hiện thực phần đã được trỏ tên. Gồm guard vai trò, policy mức bản ghi `TaskPolicy`, các use-case ghi và đọc, thuật toán rotation và reuse-detection, và adapter Prisma map domain sang persistence. Không quyết định nào ở đây cản đường Giai đoạn 7.
 
-> Ghi chú phương pháp: tài liệu cố tình ghi lựa chọn, đánh đổi, và lý do cho từng quyết định lớn. Ví dụ tách endpoint theo chủ thể thay vì field-level authz, chọn 404 cho IDOR, để refresh token trong cookie thay vì localStorage, và loại 422 khỏi tập status. Đây là phần để bảo vệ trước giảng viên và để kể chuyện khi phỏng vấn. Đặc biệt cho câu hỏi làm sao thiết kế một hợp đồng vừa chặn được IDOR và mass-assignment, vừa không over-engineer ở một đồ án 23 ngày.
+> Ghi chú phương pháp: tài liệu cố tình ghi lựa chọn, đánh đổi, và lý do cho từng quyết định lớn. Ví dụ tách endpoint theo chủ thể thay vì field-level authz, chọn 404 cho IDOR, để refresh token trong cookie thay vì localStorage, và loại 422 khỏi tập status. Đây là phần để kể chuyện khi phỏng vấn. Đặc biệt cho câu hỏi làm sao thiết kế một hợp đồng vừa chặn được IDOR và mass-assignment, vừa không over-engineer ở một dự án ~3 tuần.

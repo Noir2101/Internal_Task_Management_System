@@ -31,6 +31,8 @@ src/
   stats/          thin   — read-model, CHỈ qua TaskQueryPort
 prisma/           schema.prisma · seed.ts · migrations/
 docs/             00–06 spine (nguồn sự thật) · 07-build-plan.md · 07.A-notifications.md · 08-test-plan.md · 09-frontend-plan.md · 10-deploy-plan.md
+                  api/ (export OpenAPI tĩnh) · images/ (ảnh Swagger cho README)
+perf/             đo tải k6 — seed-scale.ts (5000 task) · tasks-list.js · RESULTS.md (số canonical PERF-01/02)
 web/              React SPA — Vite proxy same-origin; api-client refresh-retry-once; token RAM (xem docs/09) · Dockerfile + nginx.conf front-door
 STYLE-GUIDE.md    quy ước viết tài liệu kỹ thuật (đính vào session viết docs)
 CHANGELOG.md      lịch sử giai đoạn build (GĐ1–10) — tường thuật dời khỏi CLAUDE.md
@@ -92,6 +94,8 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 ## Trạng thái
 
 > Backend core (GĐ1–7) + notifications + GĐ8 test + GĐ9 frontend + GĐ10 deploy — **đã ship, hợp đồng GĐ1–10 đông cứng.** Tường thuật từng giai đoạn + trình tự build 7 bước → [`CHANGELOG.md`](CHANGELOG.md). Log chi tiết append-only → `deviations-log` / `implementation-log`. Feature mới = giai đoạn tiếp theo: doc kế hoạch đánh số mới (`docs/11-…`) + plan-mode, spine `00–06` chỉ đổi khi cố ý sửa hợp đồng (Luật số 0).
+>
+> ITMS là **dự án cá nhân** (portfolio/phỏng vấn) — không còn khung "bài nộp"; đừng tái tạo giọng đồ án trong docs mới.
 
 ## Lái Claude Code
 

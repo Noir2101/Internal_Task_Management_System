@@ -51,7 +51,7 @@ Given  một refresh token đã bị thu hồi (đã logout / đã bị xoay vò
 When   client gọi endpoint refresh
 Then   hệ thống từ chối (401) và buộc đăng nhập lại
 ```
-> Đã chốt: **rotation** trong phạm vi bản nộp (tín hiệu bảo mật tốt, rẻ vì refresh token đã lưu server). **Reuse-detection** (trình lại token đã-dùng ⇒ thu hồi cả "họ" token) thuộc **Should-have** — rotation một mình chưa cho lợi ích bảo mật chính.
+> Đã chốt: **rotation** trong phạm vi bản v1 (tín hiệu bảo mật tốt, rẻ vì refresh token đã lưu server). **Reuse-detection** (trình lại token đã-dùng ⇒ thu hồi cả "họ" token) thuộc **Should-have** — rotation một mình chưa cho lợi ích bảo mật chính.
 
 **FR-AUTH-04 — Đăng xuất**
 ```
@@ -202,13 +202,13 @@ Given  một leader của nhóm X
 When   leader mở dashboard
 Then   số liệu CHỈ tính trong phạm vi nhóm X (không lẫn nhóm khác)
 ```
-> Ghi chú: OVERDUE **không** phải bucket thứ tư ngang hàng TODO/IN_PROGRESS/DONE — gộp như vậy sẽ đếm trùng task IN_PROGRESS+OVERDUE hoặc làm mất thông tin tiến độ (đúng cảnh báo ở Giai đoạn 1 §0.4/§4.3). Vì thế dashboard tách hai lát: phân bố tiến độ (3 bucket) + lát cắt OVERDUE (cross-cut). Cấu trúc số liệu này cũng sẵn sàng cho chart (điểm cộng).
+> Ghi chú: OVERDUE **không** phải bucket thứ tư ngang hàng TODO/IN_PROGRESS/DONE — gộp như vậy sẽ đếm trùng task IN_PROGRESS+OVERDUE hoặc làm mất thông tin tiến độ (đúng cảnh báo ở Giai đoạn 1 §0.4/§4.3). Vì thế dashboard tách hai lát: phân bố tiến độ (3 bucket) + lát cắt OVERDUE (cross-cut). Cấu trúc số liệu này cũng sẵn sàng cho chart (mở rộng).
 
 ---
 
 ## PHẦN B — YÊU CẦU PHI CHỨC NĂNG
 
-> Con số đặt ở mức **hợp lý cho đồ án quy mô nhỏ** — đủ thực tế để bảo vệ, không phóng đại. Mục tiêu là chứng minh *biết cách đặt tiêu chí đo được*, không phải mô phỏng hệ thống triệu người dùng.
+> Con số đặt ở mức **hợp lý cho dự án quy mô nhỏ** — đủ thực tế để đứng vững khi bị hỏi, không phóng đại. Mục tiêu là chứng minh *biết cách đặt tiêu chí đo được*, không phải mô phỏng hệ thống triệu người dùng.
 
 ### NFR-SEC — Bảo mật (ưu tiên cao nhất với định hướng backend)
 - **SEC-01:** Mật khẩu lưu dưới dạng **hash + salt** bằng bcrypt/argon2. Không bao giờ lưu/log mật khẩu thô.
@@ -218,7 +218,7 @@ Then   số liệu CHỈ tính trong phạm vi nhóm X (không lẫn nhóm khác
 - **SEC-05:** Input được **validate** ở backend (kiểu, độ dài, định dạng) trước khi chạm DB.
 - **SEC-06:** Dùng **truy vấn tham số hoá / ORM** để chống SQL injection (không nối chuỗi SQL).
 
-### NFR-PERF — Hiệu năng & quy mô (mức đồ án)
+### NFR-PERF — Hiệu năng & quy mô (quy mô tham chiếu)
 - **PERF-01:** Hệ thống vận hành đúng với quy mô tham chiếu: **~50 user, ~10 nhóm, ~5.000 task**.
 - **PERF-02:** Danh sách task (có phân trang) trả về trong **< 1 giây** ở quy mô PERF-01.
 - **PERF-03:** Danh sách dài **bắt buộc phân trang** (đề xuất 20 item/trang) — không trả toàn bộ bảng.
@@ -229,7 +229,7 @@ Then   số liệu CHỈ tính trong phạm vi nhóm X (không lẫn nhóm khác
 - **MAINT-02:** Tách tầng rõ ràng: controller (HTTP) / service (nghiệp vụ) / repository (dữ liệu).
 - **MAINT-03:** Cấu hình (DB, secret, thời gian sống token) qua **biến môi trường**, không hard-code, không commit secret.
 - **MAINT-04:** Quy ước code nhất quán (linter/formatter).
-- **MAINT-05:** Audit log đầy đủ — ghi "ai đổi gì, khi nào" cho mọi thao tác, truy vấn được, làm bằng interceptor tập trung (cross-cutting concern) — **KHÔNG thuộc bản nộp**, để dành portfolio. Phân biệt: thao tác break-glass hiếm của admin chỉ ghi bằng **log ứng dụng thông thường** (stdout/Docker logs), không phải tính năng audit log nên không mâu thuẫn với mục này.
+- **MAINT-05:** Audit log đầy đủ — ghi "ai đổi gì, khi nào" cho mọi thao tác, truy vấn được, làm bằng interceptor tập trung (cross-cutting concern) — **KHÔNG thuộc bản v1**, để dành portfolio. Phân biệt: thao tác break-glass hiếm của admin chỉ ghi bằng **log ứng dụng thông thường** (stdout/Docker logs), không phải tính năng audit log nên không mâu thuẫn với mục này.
 
 ### NFR-DOC — Tài liệu hoá
 - **DOC-01:** API mô tả đầy đủ bằng **OpenAPI/Swagger**, sinh từ code, truy cập được khi chạy.
@@ -282,5 +282,5 @@ Từ các ràng buộc đã chốt:
   → **Ghi đè** phương án "tham chiếu leader trên bảng Team" nêu ở bản nháp trước.
 - **Task n—1 assignee** và **Task n—1 owner** (đều trỏ tới User) → tách rõ người giao và người làm.
 - **Phạm vi nhóm của Task = suy ra qua `assignee.team_id`, KHÔNG thêm cột `team_id` trên Task.** Một nguồn sự thật, không lo lệch khi reassign (reassign luôn trong nhóm).
-- **Không có bảng `audit_logs`** ở bản nộp. Thao tác break-glass của admin chỉ ghi bằng log ứng dụng, không cần bảng riêng (xem MAINT-05).
+- **Không có bảng `audit_logs`** ở bản v1. Thao tác break-glass của admin chỉ ghi bằng log ứng dụng, không cần bảng riêng (xem MAINT-05).
 - **Phạm vi task luôn xác định, không có task "không nhóm":** vì admin không tạo task ở luồng thường, mọi task đều có assignee là leader/member ⇒ phạm vi suy ra qua assignee. Thao tác break-glass của admin giữ nguyên assignee/team hiện có của task, không sinh task không thuộc nhóm nào.

@@ -11,11 +11,11 @@ Bảng này neo nghĩa các thuật ngữ lặp lại. Thân bài sau đó dùng
 
 | Thuật ngữ | Nghĩa ngắn |
 |---|---|
-| Nhóm (Team) | Đơn vị tổ chức nhỏ nhất ở bản nộp. Gồm một leader và nhiều member. |
+| Nhóm (Team) | Đơn vị tổ chức nhỏ nhất ở bản v1. Gồm một leader và nhiều member. |
 | leader | Vị trí tổ chức đứng đầu một nhóm. Quản và thấy toàn bộ việc trong nhóm. |
 | member | Thành viên thường của một nhóm. Làm việc của mình, thấy việc trong nhóm. |
 | admin | Vai trò kỹ thuật, quản nền tảng. Đứng ngoài cây tổ chức, không tham gia luồng task thường. |
-| role chức năng | Trục phân quyền theo quyền trên nền tảng. Ở bản nộp chỉ có admin. |
+| role chức năng | Trục phân quyền theo quyền trên nền tảng. Ở bản v1 chỉ có admin. |
 | vị trí tổ chức | Trục phân quyền theo chỗ đứng trong cây. Gồm leader và member. |
 | ownership | Quyền sở hữu định nghĩa một task. Thuộc về owner, tức người tạo. |
 | assignment | Quyền làm và cập nhật tiến độ một task. Thuộc về assignee. |
@@ -31,9 +31,9 @@ Bảng này neo nghĩa các thuật ngữ lặp lại. Thân bài sau đó dùng
 
 ---
 
-## 0. Bóc tách đề bài & ràng buộc
+## 0. Bóc tách yêu cầu & ràng buộc
 
-### 0.1. Yêu cầu bắt buộc (từ đề)
+### 0.1. Yêu cầu bắt buộc
 - CRUD công việc, người dùng; phân quyền cơ bản theo role.
 - Giao việc, theo dõi tiến độ, cập nhật trạng thái.
 - Dashboard thống kê theo trạng thái hoặc người phụ trách.
@@ -43,17 +43,17 @@ Bảng này neo nghĩa các thuật ngữ lặp lại. Thân bài sau đó dùng
 - Giao diện đơn giản, dễ dùng.
 - Tài liệu kỹ thuật ngắn gọn.
 
-### 0.2. Điểm cộng (đề)
+### 0.2. Tính năng mở rộng
 - Gửi email hoặc thông báo khi được giao việc.
 - Phân trang, tìm kiếm, lọc nâng cao.
 - Biểu đồ thống kê.
 
 ### 0.3. Mục tiêu cá nhân (định hình mọi quyết định)
-- Ưu tiên **best practice và production-grade** hơn là "đủ để nộp", vì đích đến là **portfolio xin việc backend**.
+- Ưu tiên **best practice và production-grade** hơn là "đủ chạy", vì đích đến là **portfolio xin việc backend**.
 - Stack là **NestJS + React**, thiên backend.
-- Thời gian bản nộp khoảng 23 ngày. Có thể nâng cấp sau cho portfolio.
+- Thời gian làm bản v1 khoảng 3 tuần. Có thể nâng cấp sau cho portfolio.
 
-### 0.4. Phát hiện khi đọc đề (điểm cần bảo vệ)
+### 0.4. Phát hiện khi phân tích yêu cầu (điểm cần lập luận rõ)
 Đề liệt kê bốn "trạng thái" là Tạo mới, Đang xử lý, Hoàn thành, và Quá hạn. Trên thực tế "Quá hạn" không cùng loại với ba cái còn lại. Ba cái đầu là tiến độ do người dùng điều khiển. Còn "Quá hạn" là tình trạng hạn do hệ thống suy ra. Việc tách hai khái niệm này, trình bày ở mục 4, là một quyết định thiết kế có chủ đích.
 
 ---
@@ -68,10 +68,10 @@ Hệ thống này mô phỏng quy trình quản lý task nội bộ. Nó cho ph�
 
 ## 2. Mô hình tổ chức & hai trục phân quyền
 
-### 2.1. Phạm vi bản nộp: cây tổ chức 2 tầng
+### 2.1. Phạm vi bản v1: cây tổ chức 2 tầng
 Cấu trúc là **Nhóm (Team) gồm nhiều Thành viên (Member)**. Một nhóm có một leader và nhiều member.
 
-Cây đầy đủ ba tầng Công ty, Phòng, Nhóm được thiết kế để mở rộng sau cho bản portfolio. Rút gọn còn hai tầng ở bản nộp là quyết định có chủ đích, để kiểm soát độ phức tạp phân quyền trong thời gian cho phép.
+Cây đầy đủ ba tầng Công ty, Phòng, Nhóm được thiết kế để mở rộng sau cho bản portfolio. Rút gọn còn hai tầng ở bản v1 là quyết định có chủ đích, để kiểm soát độ phức tạp phân quyền trong thời gian cho phép.
 
 Hai ràng buộc đã chốt, và chúng định hình schema:
 - **Mỗi nhóm có đúng một leader.**
@@ -135,7 +135,7 @@ Một việc có thể đồng thời **"Đang xử lý" và "Quá hạn"**. Lea
 Ở đây cần phân biệt hai mức của một quyết định. Một thứ "gắn ở rìa" thì hoãn được, thêm sau mà không sửa lõi. Một thứ "ăn vào lõi" thì phải đúng từ đầu.
 
 - Tình trạng quá hạn không lưu cứng thành cột rồi quên cập nhật.
-- Bản nộp suy ra lúc đọc. Chính xác là một predicate biểu diễn được trong SQL, dạng `deadline < now() AND progress != 'DONE'`. Nó không tính trong code sau khi đã fetch row. Lý do là hệ thống có lọc theo tình trạng hạn cộng phân trang. Nếu tính OVERDUE trong bộ nhớ sau khi fetch thì không thể lọc và phân trang theo OVERDUE ở tầng DB, vì phải kéo cả bảng về. Đây là quyết định ăn vào lõi tầng truy vấn, không phải chi tiết cài đặt phụ.
+- Bản v1 suy ra lúc đọc. Chính xác là một predicate biểu diễn được trong SQL, dạng `deadline < now() AND progress != 'DONE'`. Nó không tính trong code sau khi đã fetch row. Lý do là hệ thống có lọc theo tình trạng hạn cộng phân trang. Nếu tính OVERDUE trong bộ nhớ sau khi fetch thì không thể lọc và phân trang theo OVERDUE ở tầng DB, vì phải kéo cả bảng về. Đây là quyết định ăn vào lõi tầng truy vấn, không phải chi tiết cài đặt phụ.
 - Nâng cấp cho portfolio là một job định kỳ đánh dấu, phục vụ gửi thông báo đúng thời điểm vừa quá hạn.
 
 ---
@@ -153,7 +153,7 @@ Quy tắc này khái quát mọi trường hợp bằng *một* nguyên tắc, k
 - "Giao cho nhóm" nghĩa là task thuộc về **leader của nhóm đó**. Leader phân rã và giao lại cho member.
 - **Lý do:** giữ mô hình trách nhiệm rõ ràng, vì "việc của cả nhóm là việc của không ai" là phản mẫu. Lý do thứ hai là giữ schema đơn giản, vì chỉ cần `assignee_id`, không cần quan hệ many-to-many giữa task và user.
 - **Phạm vi nhóm của task bằng nhóm của assignee, và được suy ra.** Vì admin không tạo task ở luồng thường, mọi task đều có assignee là leader hoặc member. Mỗi người lại thuộc đúng một nhóm. Do đó không thêm cột `team_id` riêng trên Task. Phạm vi suy ra qua `assignee.team_id`. Cách này tránh denormalize, để khỏi có hai nguồn sự thật lệch nhau. Reassign luôn trong nhóm nên bất biến này không vỡ.
-- **Nâng cấp cho portfolio:** nếu cần một task cho nhiều người làm thật sự thì nâng lên many-to-many. Không làm ở bản nộp.
+- **Nâng cấp cho portfolio:** nếu cần một task cho nhiều người làm thật sự thì nâng lên many-to-many. Không làm ở bản v1.
 
 ### 5.3. Phạm vi nhìn thấy (visibility)
 - **Member:** thấy mọi việc trong nhóm mình. Với việc không phải của mình thì chỉ đọc. Chỉ sửa tiến độ việc được giao cho mình. Mục đích là minh bạch nội bộ nhóm.
@@ -188,7 +188,7 @@ Hệ thống ưu tiên **xoá mềm (soft-delete)** thay vì xoá cứng, để 
 | Dashboard thống kê nhóm | ❌* | ✅ (nhóm mình) | ✅ (mọi nhóm) |
 | Quản lý user, gán nhóm, gán role, vô hiệu hoá user | ❌ | ❌ | ✅ |
 
-> Dấu sao ở dòng dashboard. Member dashboard cá nhân, tức "việc của tôi", thuộc nhóm Could-have ở MoSCoW mục 9. Nó không thuộc bản nộp bắt buộc.
+> Dấu sao ở dòng dashboard. Member dashboard cá nhân, tức "việc của tôi", thuộc nhóm Could-have ở MoSCoW mục 9. Nó không thuộc bản v1 bắt buộc.
 > BG. Nhánh break-glass của admin tách bạch với luồng thường và được ghi lại bằng log ứng dụng, xem mục 2.2.
 
 ---
@@ -210,7 +210,7 @@ Hệ thống ưu tiên **xoá mềm (soft-delete)** thay vì xoá cứng, để 
 - Là member, tôi muốn tự tạo task cho chính mình để ghi nhận việc tự phát và minh bạch trong nhóm. Member không giao được cho người khác, vì quyền điều phối là của leader.
 - Là member, tôi muốn cập nhật tiến độ việc của mình, gồm Đang xử lý và Hoàn thành, để phản ánh thực tế.
 - Là member, tôi muốn thấy nhóm đang làm gì trong phạm vi nhóm để phối hợp.
-- Là member, tôi muốn được thông báo khi được giao việc mới để không bỏ sót. Đây là điểm cộng.
+- Là member, tôi muốn được thông báo khi được giao việc mới để không bỏ sót. Đây là tính năng mở rộng.
 
 ---
 
@@ -227,7 +227,7 @@ Hệ thống ưu tiên **xoá mềm (soft-delete)** thay vì xoá cứng, để 
 
 ## 9. MoSCoW — khoanh phạm vi
 
-### Must have (bản nộp)
+### Must have (bản v1)
 - Auth, gồm đăng nhập, JWT access cộng refresh token có rotation, hash mật khẩu, thu hồi khi logout.
 - Quản lý user và gán nhóm hoặc role cho admin. Có **xoá mềm** user với bất biến tổ chức ở mục 5.4, tức chặn vô hiệu hoá leader khi chưa có người thay, và báo leader để reassign khi vô hiệu hoá member.
 - CRUD task, giao việc, cập nhật tiến độ.
@@ -237,18 +237,18 @@ Hệ thống ưu tiên **xoá mềm (soft-delete)** thay vì xoá cứng, để 
 - Dashboard thống kê theo trạng thái và người phụ trách.
 - Docker Compose cho app và DB, cộng Swagger, cộng tài liệu kỹ thuật ngắn.
 
-### Should have (bản nộp nếu kịp)
+### Should have (bản v1 nếu kịp)
 - Phân trang danh sách task.
 - Lọc nâng cao theo deadline và theo tình trạng hạn.
 - Validation và thông báo lỗi rõ ràng, nhất quán.
 - Refresh token **reuse-detection**, tức trình một token đã dùng thì thu hồi cả họ token. Rotation một mình chưa cho lợi ích bảo mật chính. Reuse-detection thêm rẻ trên nền rotation, và bảo mật là ưu tiên cao nhất.
 
-### Could have (điểm cộng, đầu portfolio)
+### Could have (mở rộng, đầu portfolio)
 - Gửi email hoặc thông báo khi được giao việc.
 - Biểu đồ thống kê trên dashboard.
 - Dashboard cá nhân cho member, tức "việc của tôi".
 
-### Won't have (bản nộp, để dành portfolio)
+### Won't have (bản v1, để dành portfolio)
 - Cây tổ chức đầy đủ ba tầng Công ty, Phòng, Nhóm.
 - Task giao cho nhiều người, tức many-to-many thật sự.
 - Cross-team visibility cho leader hoặc manager.
@@ -264,4 +264,4 @@ Tài liệu này là nguồn tham chiếu cho các giai đoạn sau.
 - **Giai đoạn 5, Data schema:** thực thể User, Team, Task; quan hệ owner và assignee; enum trạng thái.
 - **Giai đoạn 6, API contract:** endpoint CRUD cộng auth cộng thống kê; nơi áp ma trận phân quyền mục 6.
 
-> Ghi chú phương pháp. Tài liệu cố tình ghi *lý do* cho từng quyết định. Ví dụ tách hai trục phân quyền, ownership tách khỏi assignment, suy ra OVERDUE, và rút gọn cây tổ chức. Đây là phần dùng để **bảo vệ trước giảng viên** và **kể chuyện khi phỏng vấn**.
+> Ghi chú phương pháp. Tài liệu cố tình ghi *lý do* cho từng quyết định. Ví dụ tách hai trục phân quyền, ownership tách khỏi assignment, suy ra OVERDUE, và rút gọn cây tổ chức. Đây là phần dùng để **kể chuyện khi phỏng vấn**.

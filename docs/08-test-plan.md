@@ -203,7 +203,7 @@ Throttle đếm mọi request bất kể pass hay fail, nên mật khẩu sai v�
 ## 7. Quan điểm coverage
 
 Không đặt coverage threshold, không gate CI. Nhất quán `build-plan §6` (coverage-gate cố tình bỏ ở bản
-nộp: "chuyện của hệ lớn, không phải bản nộp 23 ngày") và nguyên tắc mục 3 (phủ bất biến, không chạy theo
+v1: "chuyện của hệ lớn, không phải bản v1 ~3 tuần") và nguyên tắc mục 3 (phủ bất biến, không chạy theo
 phần trăm dòng). Vẫn xem được số dòng khi cần bằng `npm run test:cov`, nhưng đó là công cụ tham khảo, không
 phải một cổng.
 

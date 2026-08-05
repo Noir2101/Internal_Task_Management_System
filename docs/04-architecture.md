@@ -2,7 +2,7 @@
 
 > Hệ thống quản lý công việc nội bộ (Internal Task Management System)
 > Tài liệu này chốt **kiến trúc tổng thể** và **lý do** đằng sau nó. Mọi quyết định về schema (Giai đoạn 5) và API (Giai đoạn 6) đều truy ngược về được tài liệu này và về Giai đoạn 1–2.
-> Nguyên tắc xuyên suốt: **áp nguyên lý theo đòn bẩy, không theo giáo điều** — đi sâu ở chỗ có luật nghiệp vụ thật, giữ tối giản ở chỗ chỉ là CRUD. Đây cũng là câu trả lời cho rủi ro over-engineer của một đồ án 23 ngày.
+> Nguyên tắc xuyên suốt: **áp nguyên lý theo đòn bẩy, không theo giáo điều** — đi sâu ở chỗ có luật nghiệp vụ thật, giữ tối giản ở chỗ chỉ là CRUD. Đây cũng là câu trả lời cho rủi ro over-engineer của một dự án ~3 tuần.
 
 ---
 
@@ -12,10 +12,10 @@ Quyết định kiến trúc bị định hình bởi bốn nhóm ràng buộc �
 
 - **Nghiệp vụ:** hai trục phân quyền (chức năng `admin` vs tổ chức `leader`/`member`); ownership ≠ assignment; hai trục trạng thái task (tiến độ vs tình trạng hạn suy ra); một leader/nhóm; mỗi leader-member thuộc đúng một nhóm; admin đứng ngoài cây tổ chức và **không tham gia luồng task** (chỉ break-glass có-log).
 - **Phi chức năng:** bảo mật là ưu tiên cao nhất (record-level authz chống IDOR, JWT + refresh rotation, store dùng chung); module hoá + tách tầng; OpenAPI; Docker Compose + Postgres.
-- **Mục tiêu cá nhân:** production-grade cho **portfolio backend**, không chỉ "đủ nộp". Kiến trúc phải *kể được chuyện* khi phỏng vấn.
-- **Hoàn cảnh:** ~23 ngày, NestJS + React, thiên backend; quy mô tham chiếu ~50 user / ~10 nhóm / ~5.000 task.
+- **Mục tiêu cá nhân:** production-grade cho **portfolio backend**, không chỉ "đủ chạy". Kiến trúc phải *kể được chuyện* khi phỏng vấn.
+- **Hoàn cảnh:** ~3 tuần, NestJS + React, thiên backend; quy mô tham chiếu ~50 user / ~10 nhóm / ~5.000 task.
 
-Hai mục tiêu này (production-grade vs 23 ngày) kéo ngược nhau. Toàn bộ Giai đoạn 4 là về **cân bằng** chúng một cách có chủ đích.
+Hai mục tiêu này (production-grade vs ~3 tuần) kéo ngược nhau. Toàn bộ Giai đoạn 4 là về **cân bằng** chúng một cách có chủ đích.
 
 ---
 
@@ -29,7 +29,7 @@ Trước khi bàn cách tổ chức *bên trong*, phải chốt *hình thái tri
 | Giải vấn đề | Đơn giản build/deploy/transaction | Deploy độc lập, scale lệch từng phần, nhiều đội tách biệt |
 | Tạo vấn đề | Có thể phình thành "big ball of mud" nếu không module hoá | Phức tạp mạng, giao dịch phân tán (saga), vận hành nhiều service, eventual consistency |
 
-Ở quy mô dự án này — **~50 user, ~10 nhóm, một người làm, 23 ngày** — microservices **giải các vấn đề không tồn tại** (không có nhu cầu deploy độc lập hay scale lệch giữa Tasks và Users) và **đẻ ra các vấn đề không cần** (giao dịch phân tán cho thao tác như vô-hiệu-hoá-leader-kèm-chỉ-định-thay; vận hành nhiều container; latency mạng cho những call vốn chỉ là gọi hàm). Đây là over-engineering kinh điển. → **Chốt monolith.**
+Ở quy mô dự án này — **~50 user, ~10 nhóm, một người làm, ~3 tuần** — microservices **giải các vấn đề không tồn tại** (không có nhu cầu deploy độc lập hay scale lệch giữa Tasks và Users) và **đẻ ra các vấn đề không cần** (giao dịch phân tán cho thao tác như vô-hiệu-hoá-leader-kèm-chỉ-định-thay; vận hành nhiều container; latency mạng cho những call vốn chỉ là gọi hàm). Đây là over-engineering kinh điển. → **Chốt monolith.**
 
 Nhưng *monolith ≠ một khối bùn*: chọn **modular monolith** — ranh giới module rõ theo bounded context (§2). Đây là **đường cắt sẵn**: nếu sau này (bản portfolio, hoặc tải thật) một context cần tách thành service riêng, ranh giới module + port đã có sẵn để cắt theo, không phải mổ lại lõi.
 
@@ -51,13 +51,13 @@ Mặc định Option A khắp nơi. Riêng module có luật nghiệp vụ thậ
 | Trục đánh giá | A — Layered+Modular | B — Hexagonal toàn phần | **C — Hexagonal chọn lọc** |
 |---|---|---|---|
 | Phù hợp NestJS | Tuyệt đối (đúng grain) | Làm được nhưng ngược grain (tự wire token + mapper khắp nơi) | Đúng grain ở 3 module, chỉ "lội ngược" ở Tasks |
-| Phức tạp vs 23 ngày | Thấp nhất | Cao — rủi ro tiến độ thật (còn cả React) | Vừa — chỉ trả "thuế boilerplate" ở 1 module |
+| Phức tạp vs ~3 tuần | Thấp nhất | Cao — rủi ro tiến độ thật (còn cả React) | Vừa — chỉ trả "thuế boilerplate" ở 1 module |
 | Mở rộng portfolio | Ổn (ranh giới = module) | Xuất sắc | Rất tốt, đúng nơi nghiệp vụ sẽ lớn |
 | Tín hiệu phỏng vấn | Chắc nhưng "an toàn" | Mạnh *nếu* không bị quy là cargo-cult | **Mạnh nhất cho mục tiêu này** |
 | Rủi ro chính | Luật rò vào service biết-ORM; khó test luật biệt lập | Over-engineer cho app phần lớn là CRUD | Tính nhất quán: phải phát biểu rõ "quy tắc đi sâu" |
 
 ### 1.5. Lý do chốt C
-C giải trực tiếp căng thẳng production-grade vs 23 ngày: **SOLID/testability showcase đặt đúng chỗ đòn bẩy cao (Tasks), không trả thuế nghi thức trên CRUD tầm thường.** Câu chuyện phỏng vấn cũng mạnh nhất: *"tôi áp hexagonal chọn lọc vào bounded context có domain logic thật, giữ phần còn lại idiomatic — và đây là tiêu chí tôi dùng để vạch ranh giới"*. Rủi ro của C (tính nhất quán) được khử bằng §2.2 — phát biểu rõ quy tắc đi sâu.
+C giải trực tiếp căng thẳng production-grade vs ~3 tuần: **SOLID/testability showcase đặt đúng chỗ đòn bẩy cao (Tasks), không trả thuế nghi thức trên CRUD tầm thường.** Câu chuyện phỏng vấn cũng mạnh nhất: *"tôi áp hexagonal chọn lọc vào bounded context có domain logic thật, giữ phần còn lại idiomatic — và đây là tiêu chí tôi dùng để vạch ranh giới"*. Rủi ro của C (tính nhất quán) được khử bằng §2.2 — phát biểu rõ quy tắc đi sâu.
 
 ### 1.6. Nền tảng dữ liệu: Postgres + ORM
 
@@ -70,7 +70,7 @@ C giải trực tiếp căng thẳng production-grade vs 23 ngày: **SOLID/testa
 **ORM — niềm tin "TypeORM hợp NestJS hơn" chỉ đúng một nửa; nói thẳng để bạn chọn đúng.**
 - *Phần đúng:* có `@nestjs/typeorm` chính thức, style decorator đồng nhất với Nest, và **repository-pattern của TypeORM map gần như 1:1 lên port** (§3.2) — dễ kể chuyện hexagonal.
 - *Phần ngược lại (mạnh):* **Prisma** type-safe + DX hơn hẳn, migration mượt hơn, và — điểm sắc cho *chính kiến trúc này* — nó **ép tách domain khỏi persistence**: model Prisma là type sinh ra, không thể vô tình dùng làm domain class như `@Entity` của TypeORM. Tức là cái khiến TypeORM "thân Nest" (entity decorator tái dùng được) lại chính là **cám dỗ vi phạm domain purity §2.3** mà bạn đang muốn khoe.
-- *Điểm quyết định:* nhờ thiết kế **port + DIP** (§3.2, §4.1), ORM chỉ là **chi tiết trong adapter — swap được**, nên đây là quyết định *rủi ro thấp*: chọn cái năng suất nhất. Với hoàn cảnh này (đã thạo Prisma + 23 ngày + type-safety là điểm cộng portfolio + Prisma ép tách domain khỏi persistence) → **chốt Prisma**. Cái giá phải trả — mất vocabulary "repository 1:1" của TypeORM — là nhỏ, vì hexagonal vốn đã cần map domain↔persistence dù dùng ORM nào.
+- *Điểm quyết định:* nhờ thiết kế **port + DIP** (§3.2, §4.1), ORM chỉ là **chi tiết trong adapter — swap được**, nên đây là quyết định *rủi ro thấp*: chọn cái năng suất nhất. Với hoàn cảnh này (đã thạo Prisma + ~3 tuần + type-safety là lợi thế cho portfolio + Prisma ép tách domain khỏi persistence) → **chốt Prisma**. Cái giá phải trả — mất vocabulary "repository 1:1" của TypeORM — là nhỏ, vì hexagonal vốn đã cần map domain↔persistence dù dùng ORM nào.
 - *Prisma cắm vào port thế nào:* bọc `PrismaClient` trong một `PrismaService` (Nest provider); adapter `PrismaTaskRepository` *hiện thực* `TaskQueryPort`/`TaskWritePort`, gọi Prisma bên trong và **map model Prisma ↔ domain object** ngay tại biên adapter. Domain/use-case không hề biết Prisma (đúng §2.3).
 - *Một micro-tradeoff đã giải:* §8.4 muốn một nguồn thời gian nhất quán — với Prisma dùng **app-now tính một lần mỗi request** (hoặc `$transaction`/`$queryRaw` nếu sau này muốn giờ DB tuyệt đối); minor ở quy mô này.
 
@@ -135,7 +135,7 @@ Infrastructure cũng trỏ *vào* domain (adapter hiện thực interface do t�
 ### 3.2. Các port (chốt sớm vì là điểm móc — xem §7)
 - **`TaskWritePort`** — tạo/sửa/xoá/đổi tiến độ. Dùng bởi use-case ghi.
 - **`TaskQueryPort`** — đọc/lọc/aggregate (tổ hợp được, biểu diễn ở DB). Dùng bởi `ListTasks` *và* StatsModule (ISP — Stats chỉ thấy port đọc).
-- **`Notifier`** — phát thông báo. Bản nộp: `NoopNotifier`. Điểm cộng: `EmailNotifier`.
+- **`Notifier`** — phát thông báo. Bản v1: `NoopNotifier`. Mở rộng: `EmailNotifier`.
 
 ### 3.3. Luật domain đặt ở đâu
 | Luật (Giai đoạn 1–2) | Đặt ở |
@@ -171,7 +171,7 @@ constructor(
 
 // tasks.module.ts: adapter HIỆN THỰC port (wiring)
 { provide: TASK_REPOSITORY, useClass: PrismaTaskRepository }
-{ provide: NOTIFIER,        useClass: NoopNotifier }   // bản nộp; đổi sang EmailNotifier sau
+{ provide: NOTIFIER,        useClass: NoopNotifier }   // bản v1; đổi sang EmailNotifier sau
 ```
 
 **Chiến lược (làm C mạch lạc):** DIP đầy đủ (token) **chỉ ở Tasks** — đổi lấy test biệt lập + seam email. Auth/Users **inject repo cụ thể** (DI mà chưa DIP) — vì không có gì swap, token chỉ là thuế. Chính ranh giới "DIP ở Tasks, DI thường ở CRUD" là câu trả lời cho "anh có over-engineer không": *áp theo đòn bẩy, không theo giáo điều.*
@@ -202,22 +202,22 @@ LOGOUT:   thu hồi refresh hiện tại (xoá khỏi store)
 ```
 
 Quyết định kiến trúc kèm theo:
-- **Refresh token store dùng chung** (DB ở bản nộp; Redis là đường nâng cấp) — *không* in-memory per-instance, để claim "nhiều instance / stateless" không vỡ (SEC-02). "Stateless" ở đây = không session dính-instance, không phải không-có-state-server.
-- **Rotation trong scope; reuse-detection ở Could-have — đây là *seam có chủ đích*, không phải đường nối lỏng.** Cần nói rõ vì hai cái gắn với nhau: rotation *một mình* chỉ rút ngắn vòng đời một token bị đánh cắp (lần refresh hợp lệ kế tiếp của nạn nhân sẽ fail → bị đá ra — một tín hiệu yếu, không có phản ứng tự động); **lợi ích bảo mật chính** — phát hiện trộm token và thu hồi cả "họ" token — chỉ có khi thêm **reuse-detection**. Vậy ở bản nộp, rotation chủ yếu là **seam kiến trúc** (token đã lưu/xoay-vòng server-side, client đã quen lưu token mới), để reuse-detection sau này chỉ là *thêm logic*, không phải đập lại luồng.
+- **Refresh token store dùng chung** (DB ở bản v1; Redis là đường nâng cấp) — *không* in-memory per-instance, để claim "nhiều instance / stateless" không vỡ (SEC-02). "Stateless" ở đây = không session dính-instance, không phải không-có-state-server.
+- **Rotation trong scope; reuse-detection ở Could-have — đây là *seam có chủ đích*, không phải đường nối lỏng.** Cần nói rõ vì hai cái gắn với nhau: rotation *một mình* chỉ rút ngắn vòng đời một token bị đánh cắp (lần refresh hợp lệ kế tiếp của nạn nhân sẽ fail → bị đá ra — một tín hiệu yếu, không có phản ứng tự động); **lợi ích bảo mật chính** — phát hiện trộm token và thu hồi cả "họ" token — chỉ có khi thêm **reuse-detection**. Vậy ở bản v1, rotation chủ yếu là **seam kiến trúc** (token đã lưu/xoay-vòng server-side, client đã quen lưu token mới), để reuse-detection sau này chỉ là *thêm logic*, không phải đập lại luồng.
 - *Scope:* reuse-detection đã được đưa lên **Should-have** (MoSCoW GĐ1) — vì bảo mật là NFR ưu tiên cao nhất và nó chỉ tốn thêm ~0.5–1 ngày trên nền rotation (thêm cột "họ token"/lineage + một nhánh kiểm tra). Khi có nó, rotation mới phát huy lợi ích bảo mật đầy đủ.
 - Sau mỗi lần rotation, phía client tiếp tục với refresh token mới ở lần refresh kế tiếp. Nơi lưu token phía client là chi tiết của hợp đồng API (Giai đoạn 6). Chi phí phối hợp nhỏ.
 
 ---
 
-## 7. Điểm móc cho điểm cộng (rìa vs lõi)
+## 7. Điểm móc cho tính năng mở rộng (rìa vs lõi)
 
 > Phân biệt **"gắn ở rìa"** (hoãn thoải mái, thêm sau không sửa lõi) với **"ăn vào lõi"** (phải thiết kế đúng từ đầu dù chưa làm hết). Không code sẵn các tính năng này; chỉ đảm bảo không quyết định nào cản đường.
 
-| Tính năng điểm cộng | Phân loại | Điểm móc đặt ở bước này | Điều DUY NHẤT phải đúng ngay |
+| Tính năng mở rộng | Phân loại | Điểm móc đặt ở bước này | Điều DUY NHẤT phải đúng ngay |
 |---|---|---|---|
-| Email khi được giao việc | **RÌA** | Use-case `AssignTask` phát event `TaskAssigned` / gọi port `Notifier`; handler bản nộp = `NoopNotifier` | **Phải phát event/gọi port đúng điểm ngay bây giờ**, dù handler chưa làm gì. Không phát = sau này thêm email phải sửa lõi. |
+| Email khi được giao việc | **RÌA** | Use-case `AssignTask` phát event `TaskAssigned` / gọi port `Notifier`; handler bản v1 = `NoopNotifier` | **Phải phát event/gọi port đúng điểm ngay bây giờ**, dù handler chưa làm gì. Không phát = sau này thêm email phải sửa lõi. |
 | Biểu đồ thống kê (chart) | **RÌA** | Endpoint stats trả **counts có cấu trúc**: phân bố tiến độ (3 bucket) + lát cắt OVERDUE + theo người (đúng FR-DASH-01 đã sửa) | Số liệu có cấu trúc đó (đang làm sẵn) — chart chỉ là render frontend. Không cần gì thêm ở backend. |
-| Lọc/tìm/phân trang nâng cao | **LÕI** | `TaskQueryPort` build WHERE (gồm **OVERDUE = predicate SQL**) + LIMIT/OFFSET, tổ hợp được; tìm `ILIKE` title+description | **Không** fetch hết rồi lọc/cắt trang trong JS. Read-path "criteria → SQL → page" từ ngày đầu, dù bản nộp chỉ phơi 2 filter. Làm sai = viết lại. |
+| Lọc/tìm/phân trang nâng cao | **LÕI** | `TaskQueryPort` build WHERE (gồm **OVERDUE = predicate SQL**) + LIMIT/OFFSET, tổ hợp được; tìm `ILIKE` title+description | **Không** fetch hết rồi lọc/cắt trang trong JS. Read-path "criteria → SQL → page" từ ngày đầu, dù bản v1 chỉ phơi 2 filter. Làm sai = viết lại. |
 
 Tóm: email và chart **gắn ở rìa** (port/event + dữ liệu có cấu trúc); **tầng truy vấn ăn vào lõi** và phải đúng ngay vì nó dính ràng buộc OVERDUE-predicate-SQL.
 
@@ -250,10 +250,10 @@ OVERDUE suy ra bằng `deadline < now()`. Để tránh bug lệch giờ: dùng *
 ### 8.5. Đã cân nhắc, KHÔNG đưa vào (chống over-engineer)
 Nêu để cho thấy đã cân nhắc, không phải bỏ sót:
 - **Caching (Redis):** ~5.000 task, query có index < 1s — chưa cần. (Redis nếu xuất hiện là cho refresh-token store đa-instance, không phải cache.)
-- **Message queue:** email qua port/handler đồng bộ là đủ ở bản nộp; queue là đường nâng cấp khi cần gửi bất đồng bộ/retry.
+- **Message queue:** email qua port/handler đồng bộ là đủ ở bản v1; queue là đường nâng cấp khi cần gửi bất đồng bộ/retry.
 - **Rate limiting:** không cần toàn cục ở quy mô này — *nhưng* **endpoint auth (login/refresh) nên có throttle cơ bản** chống brute-force (bảo mật ưu tiên cao). Một dòng cấu hình, đáng làm.
 - **Observability tập trung** (tracing/metrics/log aggregation): log ứng dụng + Docker logs là đủ; APM là chuyện hệ lớn.
-- **Optimistic locking / API versioning / idempotency key:** quy mô một-đội-nhỏ, last-write-wins chấp nhận được; versioning có thể thêm `/v1` prefix rẻ về sau. Không đưa vào bản nộp.
+- **Optimistic locking / API versioning / idempotency key:** quy mô một-đội-nhỏ, last-write-wins chấp nhận được; versioning có thể thêm `/v1` prefix rẻ về sau. Không đưa vào bản v1.
 
 ---
 
@@ -281,4 +281,4 @@ Và là nguồn tham chiếu cho:
 - **Giai đoạn 5 — Data schema:** `schema.prisma` (model + enum) · User (team_id nullable) · Team (1 leader — *derive* từ User role+team_id, partial unique, **không** cột leader_id) · Task (owner ≠ assignee, *không* cột team_id riêng — scope suy ra) · RefreshToken (store dùng chung, có lineage cho reuse-detection) · `timestamptz` cho deadline · index theo PERF-04 · **chiến lược migration: `prisma migrate` (migration versioned), KHÔNG `db push` cho prod**.
 - **Giai đoạn 6 — API contract:** endpoint Auth (login/refresh-rotate/logout) · Tasks CRUD + list (filter/search/paginate) · Stats · envelope lỗi (§8.1) + rule validation field-level · nơi áp guard + policy record-level.
 
-> Ghi chú phương pháp: tài liệu cố tình ghi *lý do* và *đánh đổi* cho từng quyết định (chọn C thay vì B, áp DIP chọn lọc, vạch ranh giới đi-sâu-domain, phân loại rìa/lõi cho điểm cộng). Đây là phần dùng để **bảo vệ trước giảng viên** và **kể chuyện khi phỏng vấn** — đặc biệt câu "anh áp SOLID thế nào mà không over-engineer".
+> Ghi chú phương pháp: tài liệu cố tình ghi *lý do* và *đánh đổi* cho từng quyết định (chọn C thay vì B, áp DIP chọn lọc, vạch ranh giới đi-sâu-domain, phân loại rìa/lõi cho tính năng mở rộng). Đây là phần dùng để **kể chuyện khi phỏng vấn** — đặc biệt câu "anh áp SOLID thế nào mà không over-engineer".

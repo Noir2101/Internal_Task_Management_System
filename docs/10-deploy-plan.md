@@ -29,7 +29,7 @@
 
 ## 1. Mục tiêu và phạm vi
 
-Giai đoạn 10 là phần **bắt buộc còn lại** của bản nộp. Nó đóng gói toàn hệ thống để chạy bằng một
+Giai đoạn 10 là phần **bắt buộc còn lại** của bản v1. Nó đóng gói toàn hệ thống để chạy bằng một
 lệnh và viết lại tài liệu vận hành. Không có tính năng nghiệp vụ mới.
 
 ### 1.1. Yêu cầu ánh xạ
@@ -55,7 +55,7 @@ Toàn bộ Giai đoạn 10 chỉ thêm file cấu hình triển khai. Một bấ
 | 1 | Hình thái same-origin ở prod | Nginx front-door | Giữ same-origin, không chạm mã backend (xem §3) |
 | 2 | Migrate và seed lúc khởi động | migrate deploy + seed-if-empty | Thoả cả NFR-DEPLOY-02 lẫn 03 (xem §5) |
 | 3 | Cookie Secure và TLS | Demo qua http://localhost | localhost là secure-context, không đổi mã (xem §8.2) |
-| 4 | Swagger ở prod | Giữ mở, có ghi chú | Người chấm cần truy cập; đúng docs/06 §11 (xem §8.3) |
+| 4 | Swagger ở prod | Giữ mở, có ghi chú | Người chạy thử cần truy cập; đúng docs/06 §11 (xem §8.3) |
 | 5 | Base image | node:22-alpine multi-stage | Image nhỏ; fallback node:22-slim nếu argon2 kẹt (xem §4) |
 | 6 | Cổng và phạm vi compose | Host 8080, một file compose | Chỉ Nginx lộ ra ngoài (xem §7) |
 | 7 | Chia slice | 2 slice | Slice 1 backend, Slice 2 frontend cộng README (xem §10) |
@@ -129,13 +129,13 @@ Một điểm cần nói rõ vì nó ngược trực giác "runtime chỉ chứa
 phải prod-only**. Nó phải mang thêm ba thứ vốn là devDependency: Prisma CLI (để entrypoint chạy
 `migrate deploy`), `tsx` (để chạy seed viết bằng TypeScript), và bản `@prisma/client` đã generate.
 Lý do là entrypoint cần migrate cộng seed trước khi vào tiến trình chính. Đánh đổi là image lớn hơn
-vài chục MB. Ở một đồ án demo, đây là đổi hợp lý để lấy một entrypoint tự lo được mọi việc.
+vài chục MB. Ở một dự án demo, đây là đổi hợp lý để lấy một entrypoint tự lo được mọi việc.
 
 > Lưu ý kỹ thuật: chạy `prisma generate` ở tầng builder trên **cùng base image** với runtime. Cả
 > hai đều Alpine nên query engine sinh ra khớp đúng nền musl khi copy `node_modules` sang. Nếu builder
 > và runtime lệch nền, engine sẽ sai và Prisma báo lỗi lúc chạy.
 
-**Fallback đã ghi.** Nếu argon2 build trên musl trục trặc ở máy người chấm, đổi base sang
+**Fallback đã ghi.** Nếu argon2 build trên musl trục trặc ở máy người chạy thử, đổi base sang
 `node:22-slim` (nền Debian, glibc). Ở đó argon2 có prebuilt binary nên không phải biên dịch từ nguồn.
 Đổi lại image to hơn. Đây là phương án dự phòng, không phải mặc định.
 
@@ -166,7 +166,7 @@ seed chạy. Nếu lớn hơn không thì đã có dữ liệu, seed bỏ qua. B
 | Restart backend | lớn hơn 0 | seed bỏ qua | Dữ liệu người dùng CÒN NGUYÊN |
 | `down -v` rồi `up` (volume xoá) | 0 | seed chạy | Reseed sạch, demo lại được |
 
-Nhờ guard, một entrypoint duy nhất thoả **cả** NFR-DEPLOY-02 lẫn NFR-DEPLOY-03. Người chấm chạy một
+Nhờ guard, một entrypoint duy nhất thoả **cả** NFR-DEPLOY-02 lẫn NFR-DEPLOY-03. Người chạy thử chỉ cần một
 lệnh là có demo; restart không mất việc; muốn về trạng thái sạch thì `down -v`.
 
 ### 5.2. Guard sống ngoài seed, không sửa luật seed
@@ -279,7 +279,7 @@ cần, không đưa vào demo này.
 
 ### 8.3. Quyết định 4 — Swagger giữ mở, có ghi chú
 
-Swagger ở `/api/v1/docs` giữ mở trong image prod để người chấm khám phá API. `main.ts` và README
+Swagger ở `/api/v1/docs` giữ mở trong image prod để người chạy thử khám phá API. `main.ts` và README
 ghi rõ đây là **lựa chọn demo có chủ đích**, không phải mặc định an toàn cho prod (đúng docs/06 §11).
 Không đổi mã. Chuẩn production là gate sau một cờ môi trường; việc nói rõ điều đó chính là tín hiệu
 hiểu cái gì không nên hở ở prod.

@@ -3,7 +3,7 @@
 > Hệ thống quản lý công việc nội bộ (Internal Task Management System)
 > Tài liệu này là mini-design cho frontend. Nó KHÔNG định nghĩa lại luật nghiệp vụ. Backend (`docs/00–06`,
 > đã đông cứng và đã e2e ở `docs/08`) là nguồn sự thật; FE chỉ TIÊU THỤ hợp đồng.
-> FE "mỏng có chủ đích" vì đồ án thiên backend (`docs/01 §9` MoSCoW, `NFR-UX`). Như các tài liệu trước, nó
+> FE "mỏng có chủ đích" vì dự án thiên backend (`docs/01 §9` MoSCoW, `NFR-UX`). Như các tài liệu trước, nó
 > ghi lý do và đánh đổi cho mỗi quyết định lớn.
 > Stack: React, Vite, TypeScript; same-origin với NestJS backend.
 
@@ -46,7 +46,7 @@ Ba nguyên tắc chi phối mọi quyết định dưới đây.
 | Trục | Chốt | Lý do và đánh đổi |
 |---|---|---|
 | Build và lang | Vite, React 18, TypeScript | HMR (hot module replacement) nhanh, config proxy đơn giản, TS khớp enum và DTO backend. |
-| UI | MUI (Material UI) | Sẵn nhiều component dựng liền (Table, Dialog, Select, Chip), ít CSS tay, nhanh cho admin CRUD mỏng. Đổi lại bundle nặng hơn shadcn, chấp nhận được cho đồ án. |
+| UI | MUI (Material UI) | Sẵn nhiều component dựng liền (Table, Dialog, Select, Chip), ít CSS tay, nhanh cho admin CRUD mỏng. Đổi lại bundle nặng hơn shadcn, chấp nhận được cho dự án. |
 | Server state | TanStack Query | Cache theo query-key (khoá định danh cache), refetch và invalidate sau mutation (thao tác ghi), loading và error chuẩn. Khử phần lớn client state thủ công. |
 | Client state | React Context (AuthContext) | Chỉ giữ access token (RAM) và identity. Không cần Redux cho một FE mỏng. |
 | Form và validation | React Hook Form + Zod | Ít re-render, TS inference tốt; Zod schema mirror DTO (`docs/06 §8.1`); map `details[]` sang field error. |

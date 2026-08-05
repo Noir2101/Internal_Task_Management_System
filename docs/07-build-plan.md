@@ -227,12 +227,12 @@ Luật số 0 của `CLAUDE.md` là quan trọng nhất trong các luật prose.
 
 ## 6. Chống over-engineer, cái cố tình không làm
 
-Để cho thấy ba cổng là tiết chế chứ không phải phình ra, đây là những thứ đã cân nhắc và loại. Ở một đồ án bốn module, chúng là nghi thức.
+Để cho thấy ba cổng là tiết chế chứ không phải phình ra, đây là những thứ đã cân nhắc và loại. Ở một dự án bốn module, chúng là nghi thức.
 
 - Tự viết một eslint plugin riêng. `no-restricted-imports` có sẵn đã đủ.
 - Contract-testing kiểu Pact. Một người làm, một frontend, không có consumer ngoài.
 - Snapshot mọi response. Một projection test cho field cấm là đủ, snapshot toàn bộ là nhiễu.
-- Mutation testing và coverage gate trong CI. Là chuyện của hệ lớn, không phải bản nộp 23 ngày.
+- Mutation testing và coverage gate trong CI. Là chuyện của hệ lớn, không phải bản v1 ~3 tuần.
 - Subagents, MCP, hook phức tạp trong `.claude/`. Harness nên mỏng.
 
 > Ranh giới chống over-engineer ở đây nhất quán với cả bốn tài liệu trước. Áp nguyên lý theo đòn bẩy, không theo giáo điều. Ba cổng đều thay một kỷ luật mong manh bằng một đảm bảo rẻ, không thêm một tầng mới.
