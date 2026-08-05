@@ -63,7 +63,7 @@ export async function seedDatabase(
 
   // Mỗi nhóm đúng 1 LEADER (partial unique) + member
   const beLead = await mkUser(
-    'huy.hoangkhang21@gmail.com',
+    'be.lead@demo.local',
     'Huy',
     Role.LEADER,
     backend.id,
@@ -141,7 +141,7 @@ export async function seedDatabase(
     assigneeId: beB.id,
     deletedAt: new Date(),
   });
-  // nhóm khác — chứng minh scope tách bạch (OVERDUE của FE)
+  // nhóm khác — chứng   scope tách bạch (OVERDUE của FE)
   const feLayout = await mkTask({
     title: 'Dựng layout',
     progress: Progress.IN_PROGRESS,

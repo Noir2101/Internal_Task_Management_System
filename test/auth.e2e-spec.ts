@@ -14,7 +14,7 @@ describe('Auth (e2e)', () => {
   let app: NestExpressApplication;
   let prisma: PrismaService;
 
-  const LEADER = 'huy.hoangkhang21@gmail.com';
+  const LEADER = 'be.lead@demo.local';
 
   beforeAll(async () => {
     ({ app, prisma } = await buildTestApp());

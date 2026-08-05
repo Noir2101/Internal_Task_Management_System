@@ -131,6 +131,17 @@ Quy ước mỗi entry:
 
 ---
 
+## [Sau GĐ10] Gỡ khung "bài nộp" khỏi tài liệu + hợp nhất danh tính leader trong seed — 2026-08-05
+- Triệu chứng: (không phải bug lúc đầu) dự án chuyển sang **dự án cá nhân** dùng kể chuyện phỏng vấn, nên phải gỡ mọi vết khung cảnh nộp bài khỏi `docs/` và hai comment trong `src/`. Trong lúc rà, verify bắt được một bug thật về danh tính seed.
+- Bug (đáng nhớ — drift ba nơi, không cổng nào bắt): commit `364a210` đổi email leader nhóm Backend trong `prisma/seed.ts` sang một địa chỉ gmail cá nhân, nhưng chỉ commit `08a9647` sửa theo **ba file e2e backend**. Hai nơi còn lại vẫn giữ `be.lead@demo.local`: `README.md` §tài khoản seed và **Playwright** (`web/e2e/login.spec.ts:13`, `web/e2e/admin-stats.spec.ts:21`). Hệ quả: người clone repo về làm theo README **không đăng nhập được** bằng tài khoản leader, và bộ Playwright login-as-leader hỏng khi chạy trên DB seed thật. Không cổng nào bắt vì `npm test`/`npm run test:e2e` không chạm README lẫn Playwright, còn Playwright thì không chạy trong chuỗi cổng thường.
+- Sửa: đưa seed **về lại `be.lead@demo.local`** (thay vì sửa ngược README + Playwright theo gmail) — một giá trị làm khớp năm nơi cùng lúc (README · Playwright ×2 · `docs/08` §ví dụ curl · `login.dto.ts` `@ApiProperty example`) thay vì ba, và đồng thời gỡ email cá nhân thật khỏi seed của một repo public. Ba file e2e backend đổi ngược lại theo.
+- Quyết định kỹ thuật (không hiển nhiên từ diff):
+  - **Sửa `docs/00–06` là sửa giọng, KHÔNG sửa hợp đồng.** Diff chạm `docs/02/04/05/06` nhưng chỉ đổi từ ngữ khung cảnh (`bản nộp`→`bản v1`, `đồ án`→`dự án`, `23 ngày`→`~3 tuần`, `điểm cộng`→`mở rộng`, `người chấm`→`người chạy thử`, bỏ các câu "bảo vệ trước giảng viên"). Không một rule / status / field / `code` lỗi nào đổi, nên Luật số 0 không bị vi phạm — nhưng đây vẫn là sửa vùng đông cứng **do người yêu cầu tường minh**, không phải agent tự quyết.
+  - **`perf/` vào repo như bằng chứng đo.** `report/perf/` (k6 script + `RESULTS.md`, số canonical PERF-01/02) được cứu ra `perf/` ở gốc repo trước khi xoá `report/`; `report/api/`→`docs/api/`, `report/images/`→`docs/images/`. Lý do: số hiệu năng đã đo thật mà không có script tái lập đi kèm thì không kiểm chứng được. `.git/info/exclude` gỡ `report/` + `defense/`, giữ `cv-work/`.
+- Verify: lint xanh · unit **45/45** · e2e **42/42** (Docker Postgres `:5433`, đã `migrate deploy`) · `nest build` OK. Quan sát phụ khi chạy e2e: log `[Notifier] ERROR … 550 You can only send testing emails to your own email address` — xác nhận bộ e2e **gọi Resend API thật** (`test/setup/env.ts` `delete process.env.MAIL_ENABLED` thay vì set `'false'`), ngược với `docs/08` §2 bảng chiến lược test-DB, dòng Notifier ("e2e KHÔNG gửi email, không chạm mạng"). Nguyên nhân: `delete` chỉ đúng khi `.env` không bật mail, còn `ConfigModule` vẫn nạp `.env` của máy dev — có `MAIL_ENABLED=true` là adapter thật được bind. Test vẫn xanh vì adapter nuốt lỗi đúng thiết kế (`docs/07.A` §failure policy). **Đã biết, người dùng chọn chưa sửa** — sửa là một dòng, ghi lại đây để lần sau không phải phát hiện lại.
+
+---
+
 ## Cách thêm entry mới
 
 Thêm cuối file, theo thứ tự thời gian. Gắn số Bước (theo `CLAUDE.md` §trình tự build) để dễ tra

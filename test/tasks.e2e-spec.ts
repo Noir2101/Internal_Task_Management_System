@@ -29,7 +29,7 @@ describe('Tasks (e2e)', () => {
   beforeEach(async () => {
     h = await resetAndSeed(prisma);
     [leaderBE, memberA, memberB] = await Promise.all([
-      loginAs(app, 'huy.hoangkhang21@gmail.com').then((r) => r.accessToken),
+      loginAs(app, 'be.lead@demo.local').then((r) => r.accessToken),
       loginAs(app, 'be.a@demo.local').then((r) => r.accessToken),
       loginAs(app, 'be.b@demo.local').then((r) => r.accessToken),
     ]);

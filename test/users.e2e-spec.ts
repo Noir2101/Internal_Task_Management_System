@@ -139,7 +139,7 @@ describe('Users (e2e)', () => {
     it('non-admin (leader token) gọi /users → 404 RESOURCE_NOT_FOUND (hide)', async () => {
       const { accessToken: leaderToken } = await loginAs(
         app,
-        'huy.hoangkhang21@gmail.com',
+        'be.lead@demo.local',
       );
       const res = await request(app.getHttpServer())
         .get(`${PREFIX}/users`)
