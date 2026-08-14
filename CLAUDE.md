@@ -30,16 +30,17 @@ src/
   teams/          thin   — CRUD, leader-swap atomic, roster members
   stats/          thin   — read-model, CHỈ qua TaskQueryPort
 prisma/           schema.prisma · seed.ts · migrations/
-docs/             00–06 spine (nguồn sự thật) · 07-build-plan.md · 07.A-notifications.md · 08-test-plan.md · 09-frontend-plan.md · 10-deploy-plan.md
+docs/             00–06 spine (nguồn sự thật) · 07-build-plan.md · 07.A-notifications.md · 08-test-plan.md · 09-frontend-plan.md · 10-deploy-plan.md · 11-scaling-redis.md
                   api/ (export OpenAPI tĩnh) · images/ (ảnh Swagger cho README)
 perf/             đo tải k6 — seed-scale.ts (5000 task) · tasks-list.js · RESULTS.md (số canonical PERF-01/02)
 web/              React SPA — Vite proxy same-origin; api-client refresh-retry-once; token RAM (xem docs/09) · Dockerfile + nginx.conf front-door
 STYLE-GUIDE.md    quy ước viết tài liệu kỹ thuật (đính vào session viết docs)
-CHANGELOG.md      lịch sử giai đoạn build (GĐ1–10) — tường thuật dời khỏi CLAUDE.md
+CHANGELOG.md      lịch sử giai đoạn build (GĐ1–11) — tường thuật dời khỏi CLAUDE.md
 
-# Deploy (Docker · kế hoạch docs/10):
+# Deploy (Docker · kế hoạch docs/10 + docs/11):
 Dockerfile        backend image multi-stage node:22-alpine (argon2 build-deps ở builder · openssl ở runtime)
-docker-compose.yml postgres + backend + web (front-door); volume itms_pgdata @ /var/lib/postgresql; host :8080
+docker-compose.yml postgres + redis + backend + web (front-door); volume itms_pgdata @ /var/lib/postgresql; host :8080
+                  backend KHÔNG có container_name (compose từ chối --scale >1 khi có) ⇒ `--scale backend=N` chạy được
 scripts/          dev-free-port.mjs · docker-entrypoint.sh (migrate deploy → seed-if-empty → node dist/main) · seed-if-empty.ts
 .dockerignore     backend + web/ (loại node_modules · dist · .git · .env · coverage)
 README.md         một-lệnh Docker + tech doc ngắn (DOC-02/03)
@@ -77,6 +78,11 @@ Nhãn: **[GATE]** = cổng cơ học (lint/test/provider) fail nếu vi phạm �
 - `teamId` của user bất biến sau tạo; role chỉ đổi qua `PUT /teams/:id/leader` (atomic swap). [REVIEW]
 - Chặn deactivate leader chưa có người thay → 409 `LEADER_REPLACEMENT_REQUIRED`. [REVIEW]
 
+**Scale ngang (GĐ11 · docs/11)**
+- Backend stateless: trạng thái dùng chung DUY NHẤT ngoài Postgres là bộ đếm throttle, đặt ở Redis. Đừng thêm state vào RAM tiến trình. [REVIEW]
+- Store chọn theo sự có mặt của `REDIS_URL` (`resolveThrottlerStorage`). KHÔNG thêm fallback lặng lẽ về in-memory khi Redis chết — như vậy là tái tạo đúng lỗi vừa sửa (giới hạn nở 5×N). [REVIEW]
+- `web/nginx.conf` PHẢI giữ `resolver 127.0.0.11` + **biến** trong `proxy_pass`. Viết thẳng tên host ⇒ đo được 8/8 request dồn vào một replica ⇒ `--scale` thành vô nghĩa, im lặng (healthcheck vẫn xanh cả N). [REVIEW]
+
 **Convention hợp đồng**
 - Envelope `{statusCode,error,code,message,timestamp,path,requestId}`. FE rẽ nhánh CHỈ trên `code`. `details[]` chỉ cho `VALIDATION_FAILED`. [REVIEW]
 - Status chỉ 400/403/409 (+ 401/404/429/500). KHÔNG 422. [REVIEW]
@@ -93,7 +99,7 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Trạng thái
 
-> Backend core (GĐ1–7) + notifications + GĐ8 test + GĐ9 frontend + GĐ10 deploy — **đã ship, hợp đồng GĐ1–10 đông cứng.** Tường thuật từng giai đoạn + trình tự build 7 bước → [`CHANGELOG.md`](CHANGELOG.md). Log chi tiết append-only → `deviations-log` / `implementation-log`. Feature mới = giai đoạn tiếp theo: doc kế hoạch đánh số mới (`docs/11-…`) + plan-mode, spine `00–06` chỉ đổi khi cố ý sửa hợp đồng (Luật số 0).
+> Backend core (GĐ1–7) + notifications + GĐ8 test + GĐ9 frontend + GĐ10 deploy — **đã ship, hợp đồng GĐ1–10 đông cứng.** GĐ11 (scale ngang) đang chạy theo slice: **slice 1 Redis throttle store đã ship**; slice 2–4 (BullMQ · pino · audit log) mới phác ở `docs/11 §6`. Tường thuật từng giai đoạn + trình tự build 7 bước → [`CHANGELOG.md`](CHANGELOG.md). Log chi tiết append-only → `deviations-log` / `implementation-log`. Feature mới = giai đoạn tiếp theo: doc kế hoạch đánh số mới (`docs/12-…`) + plan-mode, spine `00–06` chỉ đổi khi cố ý sửa hợp đồng (Luật số 0).
 >
 > ITMS là **dự án cá nhân** (portfolio/phỏng vấn) — không còn khung "bài nộp"; đừng tái tạo giọng đồ án trong docs mới.
 

@@ -227,6 +227,32 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ---
 
+### Nơi đặt bộ đếm throttle + cách bật (GĐ11 slice 1)
+- Loại: phụ-lục-vĩnh-viễn (hạ tầng NGOÀI hợp đồng đông cứng — KHÔNG đẻ code/status/field FE-observable)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/auth/throttler-storage.ts (mới) · src/auth/auth.module.ts (`forRoot`→`forRootAsync`) · docker-compose.yml (service `redis`, `REDIS_URL`, bỏ `container_name` của backend) · web/nginx.conf (resolver + biến trong `proxy_pass`) · .env.example
+- Hợp đồng nói gì: `docs/04` §6.4 chỉ nói endpoint auth "nên có throttle cơ bản" chống brute-force; `docs/06` §11 khoá 429 + `RATE_LIMITED`. IM LẶNG: bộ đếm nằm ở ĐÂU, và điều gì xảy ra khi chạy nhiều instance.
+- Quyết định (duyệt qua plan-mode AskUserQuestion — Luật số 0):
+  - **Store:** `@nest-lab/throttler-storage-redis` (adapter của chính maintainer `@nestjs/throttler`) + `ioredis` **ghim `^5`**. Peer của adapter ghi `>=5.0.0` nên `npm i ioredis` lấy v6, trong khi adapter kiểm `instanceof Redis | Cluster` theo API v5 — ghim cho tới khi adapter nói rõ hỗ trợ v6.
+  - **Cách bật:** theo sự CÓ MẶT của `REDIS_URL` (`resolveThrottlerStorage`). Rỗng → `undefined` → `ThrottlerStorageProvider` tự dựng in-memory. Nhờ vậy `npm test`, `npm run test:e2e` và `start:dev` chạy y như trước, KHÔNG cần Redis, không mở socket. Compose đặt `redis://redis:6379`.
+  - **KHÔNG fallback lặng lẽ về in-memory khi Redis chết.** Redis chết ⇒ login 500 (fail-closed) thay vì âm thầm quay về đúng lỗi vừa sửa. Đã ghi vào `CLAUDE.md` §Bất biến để không ai "sửa" nó sau này.
+  - **Giới hạn, `skipIf`, 429, `Retry-After`, mã `RATE_LIMITED` giữ NGUYÊN XI.** Đây là đổi chỗ đặt bộ đếm, không đổi hợp đồng. `forRoot`→`forRootAsync` chỉ vì cần `ConfigService` để bơm `storage`.
+  - **Bỏ `container_name: itms-backend`** trong compose: compose từ chối `--scale` lớn hơn 1 khi container bị đặt tên cứng. Đã rà repo, không file nào tham chiếu tên cũ.
+- Lý do: `docs/04` chọn throttle vì lý do bảo mật, mà store in-memory làm giới hạn nở thành 5 nhân N khi scale — đặt bộ đếm ra ngoài tiến trình là giữ đúng ý định của rule, không phải nới nó. Không thêm surface FE-observable nào.
+
+---
+
+### Sửa `web/nginx.conf` — phân giải tên lúc chạy (GĐ11 slice 1)
+- Loại: phụ-lục-vĩnh-viễn (sửa lỗi hạ tầng GĐ10; `docs/10` không phải vùng đông cứng `00–06`)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: web/nginx.conf (`resolver 127.0.0.11 valid=10s ipv6=off` + `set $itms_backend` + `proxy_pass $itms_backend$request_uri`)
+- Hợp đồng nói gì: `docs/10` §6 khoá **ba điều bắt buộc** của front-door — không rewrite path, chuyển tiếp `X-Forwarded-*`, SPA fallback. IM LẶNG về cách phân giải tên `backend`.
+- Quyết định: dùng resolver của Docker cộng **biến** trong `proxy_pass`. Cả ba điều bắt buộc giữ nguyên: `$request_uri` là URI thô của client kèm query string (không rewrite), các `proxy_set_header` không đổi, `location /` không đụng tới.
+- Lý do: `proxy_pass http://backend:3000` với tên host viết thẳng phân giải MỘT LẦN lúc khởi động rồi giữ nguyên. Đo bằng nginx probe riêng với `log_format` in `$upstream_addr`: tên viết thẳng → **8/8 request vào `172.22.0.4`**; resolver + biến → 3 vào `.4`, 5 vào `.6`. Hệ quả suốt GĐ10: `--scale backend=N` tạo N container nhưng gần như toàn bộ traffic vào đúng một cái — im lặng, không log, không lỗi, healthcheck xanh cả N. Chỉ khi đích chứa biến thì nginx mới hoãn phân giải sang lúc chạy và mới dùng `resolver`.
+- **Đính chính cơ chế (2026-08-06, cùng ngày):** bản ghi đầu quy cho `getaddrinfo` của musl trả thiếu địa chỉ. **SAI, đã bác bỏ bằng đo:** gọi thẳng `socket.getaddrinfo` trong image Alpine (musl) lẫn Debian (glibc) đều ra đủ hai địa chỉ; `getent hosts` chỉ in dòng đầu nên gây lầm. Thêm nữa, tắt đúng replica đang bị ghim thì 4/4 request tiếp theo vẫn 200 ⇒ nginx CÓ giữ địa chỉ thứ hai, nhưng chỉ dùng làm dự phòng chứ không chia phần traffic. Tài liệu nginx nói nhiều địa chỉ thì round-robin, nên hành vi đo được khác kỳ vọng từ tài liệu; lý do bên trong nginx chưa truy tới cùng. **Phần chắc chắn là số đo**, và số đo đủ kết luận: khả dụng còn, chia tải thì không.
+
+---
+
 ## Cách thêm entry mới
 
 Mỗi khi `/check-spine` hoặc plan-mode review gặp một chỗ spine để ngỏ và bạn duyệt một giá trị cụ thể, thêm entry vào đây **trước khi commit** — đừng để trôi vào chỉ commit message. Gắn `Loại`:

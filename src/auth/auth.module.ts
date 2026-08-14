@@ -6,6 +6,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { resolveThrottlerStorage } from './throttler-storage';
 
 /**
  * Auth (thin). JwtModule wire secret + TTL access từ ConfigService (ConfigModule @Global ở Bước 1).
@@ -16,15 +17,24 @@ import { JwtAuthGuard } from './jwt-auth.guard';
  * mọi endpoint mặc-định-bảo-vệ, opt-out bằng `@Public()`. RolesGuard (common/) apply per-controller
  * ở Bước 4–6, chạy sau guard global này.
  *
- * `ThrottlerModule.forRoot` (Bước 7, §6.4) cấp dep cho `ThrottlerGuard`. KHÔNG đăng ký guard này
+ * `ThrottlerModule` (Bước 7, §6.4) cấp dep cho `ThrottlerGuard`. KHÔNG đăng ký guard này
  * APP_GUARD (toàn cục) — chỉ `@UseGuards(ThrottlerGuard)` per-method ở `/auth/login` + `/auth/refresh`
  * (ttl=60000ms; limit override per-route). Stats/Tasks/Users/Teams KHÔNG bị siết.
+ *
+ * GĐ11 slice 1: `forRoot` → `forRootAsync` CHỈ để bơm được `storage` theo env (docs/11 §2). Giới hạn,
+ * `skipIf` và mã lỗi 429 `RATE_LIMITED` giữ nguyên xi — đây là đổi CHỖ ĐẶT counter, không đổi hợp đồng.
  */
 @Module({
   imports: [
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60000, limit: 10 }],
-      skipIf: () => process.env.THROTTLE_DISABLED === 'true',
+    ThrottlerModule.forRootAsync({
+      // ConfigModule là @Global (Bước 1) → không cần khai `imports` ở đây.
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [{ ttl: 60000, limit: 10 }],
+        skipIf: () => process.env.THROTTLE_DISABLED === 'true',
+        // Thiếu REDIS_URL ⇒ undefined ⇒ in-memory (dev/test). Có ⇒ counter chung mọi replica.
+        storage: resolveThrottlerStorage(config.get<string>('REDIS_URL')),
+      }),
     }),
     JwtModule.registerAsync({
       inject: [ConfigService],

@@ -19,22 +19,42 @@ services:
       timeout: 5s
       retries: 10
 
+  # GĐ11 Slice 1 — Redis: shared store for the auth throttle counter. In-memory counters live in one
+  # process, so N backend replicas would each allow the full limit (5 logins/min becomes 5×N).
+  # This state is ephemeral (keys expire in 60s) → persistence off, no volume, no host port.
+  redis:
+    image: redis:8-alpine
+    container_name: itms-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # GĐ10 Slice 1 — backend image (Dockerfile). Entrypoint: migrate deploy → seed-if-empty →
   # node dist/main. NOT exposed to host (web front-door lands in Slice 2). Env uses ${VAR:-demo}
   # substitution so `up` works with no .env; a project-dir .env overrides. DATABASE_URL is the
   # internal service host `postgres` (not a secret — mirrors the pg creds above).
+  #
+  # No container_name on purpose (GĐ11): compose refuses `--scale backend=N` when one is pinned,
+  # and scaling is how the shared rate-limit store gets verified. Containers get itms-backend-1…N.
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: itms-backend
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://itms:itms@postgres:5432/itms?schema=public
+      # Empty/unset → in-memory throttle store (dev + test path). See src/auth/throttler-storage.ts.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-demo-only-not-a-real-secret-change-me}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       REFRESH_TTL_DAYS: ${REFRESH_TTL_DAYS:-7}

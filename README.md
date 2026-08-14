@@ -39,6 +39,28 @@ docker compose down -v    # dừng và XOÁ volume → lần up sau seed lại t
 Dữ liệu bền qua restart nhờ volume `itms_pgdata`; seed có guard `user.count()==0` nên restart không
 ghi đè dữ liệu bạn tạo.
 
+### Chạy nhiều instance backend
+
+Backend không giữ trạng thái riêng, nên thêm replica là đủ để chia tải:
+
+```bash
+docker compose up -d --build --scale backend=2
+```
+
+Bộ đếm throttle nằm ở Redis chứ không ở RAM tiến trình, nên giới hạn "5 lần login mỗi phút mỗi IP"
+giữ nguyên dù chạy bao nhiêu replica. Kiểm nhanh — request thứ 6 phải trả 429:
+
+```bash
+for i in $(seq 1 6); do
+  curl -s -o /dev/null -w "%{http_code} " -X POST http://localhost:8080/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"admin@demo.local","password":"wrong"}'
+done; echo
+# 401 401 401 401 401 429
+```
+
+Chi tiết cách làm và số đo đầy đủ ở [`docs/11-scaling-redis.md`](docs/11-scaling-redis.md).
+
 ---
 
 ## Kiến trúc
@@ -57,13 +79,15 @@ gửi đúng chỗ và không dính CORS.
         └────────────┬────────────┘
                      │  mạng nội bộ itms
         ┌────────────▼────────────┐
-        │  backend (node:22)      │   NestJS, prefix /api/v1
+        │  backend (node:22) ×N   │   NestJS, prefix /api/v1 — stateless, scale được
         │  entrypoint: migrate    │   → seed-if-empty → node dist/main
-        └────────────┬────────────┘
-                     │
-        ┌────────────▼────────────┐
-        │  postgres:18            │   volume itms_pgdata → /var/lib/postgresql
-        └─────────────────────────┘
+        └───────┬─────────┬───────┘
+                │         │
+   ┌────────────▼──┐   ┌──▼───────────────┐
+   │  postgres:18  │   │  redis:8-alpine  │   store throttle dùng chung
+   │  volume       │   │  không persist   │   (bộ đếm hết hạn 60s)
+   │  itms_pgdata  │   └──────────────────┘
+   └───────────────┘
 ```
 
 **Stack:** NestJS · Prisma · PostgreSQL 18 · argon2 (backend) — React · Vite · TypeScript · MUI ·
@@ -89,11 +113,15 @@ Bốn model: `User`, `Team`, `Task`, `RefreshToken`. Điểm chính:
 - **Kiến trúc hexagonal ở module Tasks** (domain thuần, port/adapter).
 - **Triển khai** — nginx front-door giữ same-origin (không chạm mã backend); entrypoint
   `migrate deploy → seed-if-empty → node dist/main`.
+- **Mở rộng ngang** — backend stateless; trạng thái dùng chung duy nhất ngoài Postgres là bộ đếm
+  throttle, đặt ở Redis. nginx phân giải tên qua DNS Docker lúc chạy nên nhận đủ mọi replica.
 
 ### Ghi chú demo
 - **Swagger để mở** ở `/api/v1/docs` chỉ để demo;
   prod nên gate sau một cờ môi trường.
 - **Throttle bật** ở prod (login ~5 lần/phút/IP); `THROTTLE_DISABLED` chỉ dành cho e2e.
+  Bộ đếm ở Redis khi có `REDIS_URL` (compose tự đặt), rơi về in-memory khi không có — nên `npm test`
+  và `npm run start:dev` không cần Redis.
 - **Cookie `Secure`** bật (`NODE_ENV=production`) và vẫn chạy qua `http://localhost` vì `localhost` là
   secure-context. Truy cập qua IP LAN nằm ngoài phạm vi demo.
 - Bí mật đi qua biến môi trường (xem [`.env.example`](.env.example)); giá trị mặc định trong compose là
@@ -117,4 +145,4 @@ cd web && npm install && npm run dev   # http://localhost:5173
 
 ## Lịch sử
 
-Tường thuật các giai đoạn build (GĐ1–10) ở [`CHANGELOG.md`](CHANGELOG.md); luật/bất biến kiến trúc ở [`CLAUDE.md`](CLAUDE.md), spine đầy đủ ở `docs/00–06`.
+Tường thuật các giai đoạn build (GĐ1–11) ở [`CHANGELOG.md`](CHANGELOG.md); luật/bất biến kiến trúc ở [`CLAUDE.md`](CLAUDE.md), spine đầy đủ ở `docs/00–06`.

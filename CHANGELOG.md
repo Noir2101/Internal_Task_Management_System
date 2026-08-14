@@ -37,3 +37,9 @@ Plan `docs/09` + **SPA build đầy đủ ở `web/`** — React+Vite+TS · MUI 
 - **Slice 2 — web front-door:** `web/Dockerfile` multi-stage node→nginx:alpine · `web/nginx.conf` serve SPA + reverse-proxy `/api`→backend KHÔNG rewrite + X-Forwarded + SPA fallback · compose `web` 8080:80 depends_on backend-healthy · README viết lại VN một-lệnh · verify full-stack §11 xanh.
 
 **GĐ10 HOÀN TẤT.**
+
+### GĐ11 — Scale ngang (Redis) 🚧
+**Plan (`docs/11`):** backend chạy được nhiều instance song song mà hành vi không đổi. Không endpoint mới, không đổi envelope; hợp đồng `docs/00–06` giữ nguyên (giới hạn 5/phút login, 429 `RATE_LIMITED`, `Retry-After` y hệt). 4 slice.
+
+- **Slice 1 — Redis throttle store ✅:** `resolveThrottlerStorage` (`src/auth/throttler-storage.ts`) chọn store theo sự có mặt `REDIS_URL` — rỗng thì in-memory (dev/test không cần Redis), có thì `@nest-lab/throttler-storage-redis` + `ioredis` ghim `^5` · `ThrottlerModule.forRoot`→`forRootAsync` chỉ để bơm `storage` · compose thêm service `redis` (persistence tắt, không volume, không expose) + bỏ `container_name` của backend để `--scale backend=N` chạy được · **fix `web/nginx.conf`**: resolver Docker + biến trong `proxy_pass` (tên host viết thẳng phân giải một lần lúc boot; đo `$upstream_addr` ra 8/8 request dồn vào một replica ⇒ `--scale` vô nghĩa suốt GĐ10, im lặng) · verify 2 replica có đối chứng: in-memory `401×8 429 401` (giới hạn nở, chặn thất thường) so với Redis `401×5 429×5` (đúng 5/phút).
+- **Slice 2–4 — phác ở `docs/11 §6`:** BullMQ email + cron overdue digest · structured logging pino · audit log append-only.
