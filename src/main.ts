@@ -1,3 +1,8 @@
+// PHẢI là import đầu tiên (GĐ11 slice 2, docs/11 §6). `tasks.module.ts` đọc `REDIS_URL` lúc dựng
+// metadata module, và thời điểm đó xảy ra TRƯỚC khi `ConfigModule.forRoot()` trong `app.module.ts`
+// nạp `.env`. Không có dòng này thì `REDIS_URL` đặt trong `.env` bật được throttle store của slice 1
+// nhưng lại im lặng không bật queue — cùng một biến mà hai cơ chế hiểu khác nhau.
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

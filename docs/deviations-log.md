@@ -253,6 +253,25 @@ Quy ước mỗi entry. Field `Loại` phân biệt hai bản chất khác nhau:
 
 ---
 
+### Đưa việc gửi email ra khỏi đường request + lịch digest quá hạn (GĐ11 slice 2)
+- Loại: phụ-lục-vĩnh-viễn (hạ tầng NGOÀI hợp đồng đông cứng — KHÔNG đẻ code/status/field FE-observable)
+- Trạng thái: mở (không hạn đóng)
+- Vị trí: src/tasks/infrastructure/queue/ (mới, 5 file + 3 spec) · src/tasks/infrastructure/direct-notifier.ts (mới) · src/tasks/application/ports/notifier.port.ts (hook thứ tư) · src/tasks/infrastructure/email-notifier.ts (`TaskQueryPort` + cờ `rethrow` + `notifyOverdueDigest`) · src/tasks/tasks.module.ts · src/main.ts · test/setup/env.ts · docker-compose.yml · .env.example
+- Hợp đồng nói gì: `docs/06` §9.3 tiên liệu seam `Notifier` và để dành `EmailNotifier` cho portfolio; `docs/07.A` §5 chốt failure policy "await rồi nuốt lỗi" và ghi rõ queue "vượt phạm vi tính năng bonus". IM LẶNG: việc gửi xảy ra Ở ĐÂU trong vòng đời request, có thông báo chủ động cho task quá hạn hay không, và nếu có thì theo lịch nào.
+- Quyết định (duyệt qua plan-mode AskUserQuestion — Luật số 0):
+  - **Hook thứ tư trên port `Notifier`** (`notifyOverdueDigest`) thay vì một service riêng ở infrastructure. Lý do: tái dùng nguyên ba thứ đã có sau seam — gate `MAIL_ENABLED`, bất biến nuốt-lỗi, lớp bọc queue. Service riêng phải chép lại cả ba. Đúng tiền lệ `docs/07.A` khi thêm `notifyAssigned`; đã đồng bộ `src/tasks/CLAUDE.md`.
+  - **Queue nằm SAU seam**, dạng decorator `QueuedNotifier`. `CreateTask` / `ReassignTask` / `Users.deactivate` KHÔNG sửa một dòng nào.
+  - **Hai token `NOTIFIER` / `DIRECT_NOTIFIER`.** Worker phải gọi adapter thật; gọi lại `NOTIFIER` (là `QueuedNotifier`) thì mỗi job xử lý xong lại đẻ một job y hệt.
+  - **Lịch = repeatable job của BullMQ, KHÔNG `@nestjs/schedule`.** `@Cron` sống trong tiến trình nên N replica là N lần bắn. Đây là chỗ lệch với `cv-work/CLAUDE.md` §4 (bảng roadmap ghi `@nestjs/schedule` + `@Cron`) — lệch có chủ đích, và đã verify bằng `--scale backend=2`.
+  - **Mặc định `OVERDUE_DIGEST_CRON='0 1 * * *'` UTC** (08:00 giờ VN), `tz` ghi tường minh vì hợp đồng dùng ISO-8601 UTC ở mọi nơi.
+  - **Digest liệt kê tối đa 10 dòng**, phần dư gộp "và N task khác". KHÔNG gửi khi `total === 0` (thư "không có gì quá hạn" mỗi sáng là cách nhanh nhất để người ta lọc bỏ cả kênh) hoặc khi nhóm không có leader đang hoạt động (không có người nhận).
+  - **Quét qua `TaskQueryPort.list({overdue:true})`, KHÔNG export `overduePredicate`.** Giữ đúng một đường vào định nghĩa OVERDUE, dùng chung với cờ `overdue` của `GET /tasks` và `byAssignee.overdue` của Stats.
+  - **Cờ `rethrow` trên `EmailNotifier`.** Đường use-case giữ `false` (y hệt trước slice). Đường worker bật `true` — đã ngoài đường request nên ném không vỡ gì, và đó là cách duy nhất để `attempts` không thành trang trí. Bất biến "email không vỡ task-write" đổi CHỖ ĐỨNG chứ không đổi nội dung: trên đường có queue, chỗ bảo vệ là `QueuedNotifier` phía ghi job. Đã chú thích vào `docs/07.A` §5.
+  - **Redis chết ⇒ mất thông báo + log lỗi, KHÔNG fallback lặng lẽ về gửi đồng bộ** — cùng lý lẽ với slice 1, và `docs/07.A` vốn đã chấp nhận "email lỗi thì chỉ log".
+- Lý do: `docs/07.A` §5 tự ghi đánh đổi này là tạm và lý do duy nhất để giữ nó ("thêm hạ tầng") đã biến mất khi slice 1 đưa Redis vào compose. Đo được: `POST /tasks` từ ~2,75 giây xuống ~11 mili giây. Không thêm surface FE-observable nào: không endpoint, không `code` lỗi, không field, không migration.
+
+---
+
 ## Cách thêm entry mới
 
 Mỗi khi `/check-spine` hoặc plan-mode review gặp một chỗ spine để ngỏ và bạn duyệt một giá trị cụ thể, thêm entry vào đây **trước khi commit** — đừng để trôi vào chỉ commit message. Gắn `Loại`:

@@ -82,6 +82,8 @@ Nhãn: **[GATE]** = cổng cơ học (lint/test/provider) fail nếu vi phạm �
 - Backend stateless: trạng thái dùng chung DUY NHẤT ngoài Postgres là bộ đếm throttle, đặt ở Redis. Đừng thêm state vào RAM tiến trình. [REVIEW]
 - Store chọn theo sự có mặt của `REDIS_URL` (`resolveThrottlerStorage`). KHÔNG thêm fallback lặng lẽ về in-memory khi Redis chết — như vậy là tái tạo đúng lỗi vừa sửa (giới hạn nở 5×N). [REVIEW]
 - `web/nginx.conf` PHẢI giữ `resolver 127.0.0.11` + **biến** trong `proxy_pass`. Viết thẳng tên host ⇒ đo được 8/8 request dồn vào một replica ⇒ `--scale` thành vô nghĩa, im lặng (healthcheck vẫn xanh cả N). [REVIEW]
+- Email thông báo KHÔNG gửi trong đường request khi có `REDIS_URL`: `QueuedNotifier` ghi job, worker gửi. Lớp bọc nằm SAU seam `Notifier` — use-case không được biết có queue. [REVIEW]
+- Lịch digest quá hạn nằm ở Redis (repeatable job BullMQ), KHÔNG `@Cron` trong tiến trình — `@Cron` chạy trên cả N replica nên leader nhận N bản trùng. [REVIEW]
 
 **Convention hợp đồng**
 - Envelope `{statusCode,error,code,message,timestamp,path,requestId}`. FE rẽ nhánh CHỈ trên `code`. `details[]` chỉ cho `VALIDATION_FAILED`. [REVIEW]
@@ -99,7 +101,7 @@ Snippet khởi tạo ba cổng: `docs/07-build-plan.md` §2.
 
 ## Trạng thái
 
-> Backend core (GĐ1–7) + notifications + GĐ8 test + GĐ9 frontend + GĐ10 deploy — **đã ship, hợp đồng GĐ1–10 đông cứng.** GĐ11 (scale ngang) đang chạy theo slice: **slice 1 Redis throttle store đã ship**; slice 2–4 (BullMQ · pino · audit log) mới phác ở `docs/11 §6`. Tường thuật từng giai đoạn + trình tự build 7 bước → [`CHANGELOG.md`](CHANGELOG.md). Log chi tiết append-only → `deviations-log` / `implementation-log`. Feature mới = giai đoạn tiếp theo: doc kế hoạch đánh số mới (`docs/12-…`) + plan-mode, spine `00–06` chỉ đổi khi cố ý sửa hợp đồng (Luật số 0).
+> Backend core (GĐ1–7) + notifications + GĐ8 test + GĐ9 frontend + GĐ10 deploy — **đã ship, hợp đồng GĐ1–10 đông cứng.** GĐ11 (scale ngang) đang chạy theo slice: **slice 1 Redis throttle store + slice 2 BullMQ async email/digest đã ship**; slice 3–4 (pino · audit log) mới phác ở `docs/11 §8`. Tường thuật từng giai đoạn + trình tự build 7 bước → [`CHANGELOG.md`](CHANGELOG.md). Log chi tiết append-only → `deviations-log` / `implementation-log`. Feature mới = giai đoạn tiếp theo: doc kế hoạch đánh số mới (`docs/12-…`) + plan-mode, spine `00–06` chỉ đổi khi cố ý sửa hợp đồng (Luật số 0).
 >
 > ITMS là **dự án cá nhân** (portfolio/phỏng vấn) — không còn khung "bài nộp"; đừng tái tạo giọng đồ án trong docs mới.
 

@@ -11,7 +11,20 @@ export const TEST_DATABASE_URL =
 
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 process.env.NODE_ENV = 'test';
-delete process.env.MAIL_ENABLED; // → NoopNotifier (mặc-định-offline)
+
+/**
+ * Cách khoá một biến là GÁN giá trị falsy, KHÔNG `delete`.
+ *
+ * `ConfigModule.forRoot()` điền biến từ `.env` qua bộ lọc `!(key in process.env)`, tức nó chỉ chừa
+ * ra key ĐÃ TỒN TẠI. `delete` làm key biến mất, nên dotenv thấy chỗ trống rồi điền giá trị của `.env`
+ * vào — đúng ngược điều mong muốn. Với `MAIL_ENABLED` thì hậu quả là lưới e2e dựng `EmailNotifier`
+ * và bắn email THẬT qua SMTP của `.env` mỗi lần test tạo task, reassign, hay deactivate.
+ */
+process.env.MAIL_ENABLED = 'false'; // → NoopNotifier (mặc-định-offline), không chạm mạng
+
+// GĐ11: khoá cả hai đường Redis — throttle store (slice 1) và queue thông báo (slice 2). Lưới e2e
+// phải chạy được khi không có Redis, và không được mượn Redis của máy dev qua `.env`.
+process.env.REDIS_URL = '';
 
 // Auth secrets hermetic cho test (không phụ thuộc .env có mặt hay không).
 process.env.JWT_ACCESS_SECRET ??=

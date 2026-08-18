@@ -53,8 +53,12 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://itms:itms@postgres:5432/itms?schema=public
-      # Empty/unset → in-memory throttle store (dev + test path). See src/auth/throttler-storage.ts.
+      # Empty/unset → in-memory throttle store AND no notification queue (dev + test path).
+      # See src/auth/throttler-storage.ts and src/tasks/infrastructure/queue/notification-queue.ts.
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # GĐ11 Slice 2 — overdue digest schedule, UTC. Default 01:00 UTC = 08:00 Vietnam time.
+      # The schedule lives in Redis (BullMQ job scheduler), so N replicas still send ONE digest.
+      OVERDUE_DIGEST_CRON: ${OVERDUE_DIGEST_CRON:-0 1 * * *}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-demo-only-not-a-real-secret-change-me}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       REFRESH_TTL_DAYS: ${REFRESH_TTL_DAYS:-7}

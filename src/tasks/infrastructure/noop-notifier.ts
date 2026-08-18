@@ -19,4 +19,8 @@ export class NoopNotifier implements Notifier {
   notifyTasksOrphaned(): Promise<void> {
     return Promise.resolve();
   }
+
+  notifyOverdueDigest(): Promise<void> {
+    return Promise.resolve();
+  }
 }

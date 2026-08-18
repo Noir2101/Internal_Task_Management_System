@@ -55,7 +55,8 @@ người), đã được xác nhận.
 | Cô lập | Truncate hết bảng cộng reseed fixture TRƯỚC mỗi test (`beforeEach`) | Mỗi test độc lập hoàn toàn. `seedDatabase` tự reset rồi tạo, một lệnh lo cả hai. |
 | Tốc độ | Hash argon2 của seed tính MỘT lần cho cả run (cache) | argon2 chậm khoảng 100ms mỗi hash; cache cho reseed per-test không cộng dồn. |
 | Song song | `maxWorkers: 1` | Một DB test dùng chung cộng truncate-per-test; chạy song song sẽ giẫm nhau. |
-| Notifier | `NoopNotifier` (biến `MAIL_ENABLED` bị xoá ở `test/setup/env.ts`) | e2e KHÔNG gửi email, không chạm mạng. |
+| Notifier | `NoopNotifier` (`test/setup/env.ts` **gán** `MAIL_ENABLED='false'`) | e2e KHÔNG gửi email, không chạm mạng. Phải GÁN chứ không `delete`: dotenv chỉ chừa key đã tồn tại, nên xoá key là mời `.env` của máy dev điền vào (`docs/11` mục 7.4). |
+| Redis | `test/setup/env.ts` gán `REDIS_URL=''` | Khoá cả throttle store (GĐ11 slice 1) lẫn queue thông báo (slice 2). Lưới e2e chạy một tiến trình, KHÔNG cần Redis. |
 | Throttle | `ThrottlerGuard` override thành pass-through trong app e2e | Suite login-nhiều không dính 429 giả; 429 verify bằng smoke tay (mục 6). |
 
 Biến `DATABASE_URL` trỏ `itms_test` được set ở `test/setup/env.ts` (chạy trước khi test import
@@ -197,6 +198,11 @@ done
 ```
 
 Throttle đếm mọi request bất kể pass hay fail, nên mật khẩu sai vẫn tính vào giới hạn.
+
+Queue thông báo và digest quá hạn (Giai đoạn 11 slice 2) đi theo đúng lệ này. Lưới e2e cố ý chạy
+không có Redis nên không có queue để mà test, còn digest thì phụ thuộc lịch và trạng thái cộng dồn,
+tức đúng loại thứ gây flaky. Phần logic thuần có test unit; phần chạy thật kiểm bằng smoke tay nhiều
+instance, ghi ở `docs/11` mục 7.
 
 ---
 

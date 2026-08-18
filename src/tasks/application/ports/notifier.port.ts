@@ -31,14 +31,30 @@ export interface TasksOrphanedEvent {
 }
 
 /**
+ * Event digest quá hạn (GĐ11 slice 2, docs/11 §6) — hook thứ tư, KHÁC ba hook kia ở chỗ nó KHÔNG
+ * phát từ use-case mà từ lịch định kỳ nằm ở infrastructure. Vì vậy không use-case nào gọi method
+ * này; nó ở trên port để dùng lại ba thứ đã có sau seam: gate `MAIL_ENABLED`, bất biến nuốt-lỗi,
+ * và lớp bọc queue.
+ *
+ * `now` đi KÈM event (không lấy trong adapter): một lượt quét chốt MỘT mốc rồi truyền cho mọi nhóm,
+ * nên predicate overdue của các nhóm không thể lệch nhau (cổng 3).
+ */
+export interface OverdueDigestEvent {
+  teamId: string;
+  now: Date;
+}
+
+/**
  * Notifier port — SEAM (src/tasks/CLAUDE.md). Bản nộp dùng `NoopNotifier` (không làm gì), portfolio
  * thay `EmailNotifier` báo assignee (lúc tạo / reassign) và báo leader (task treo). PHẢI phát event
  * đúng điểm DÙ handler chưa làm gì — không phát = sau này thêm email phải mổ lại lõi use-case /
- * luồng deactivate. Ba hook point: CreateTask (notifyAssigned), ReassignTask (notifyReassigned),
- * Users.deactivate (notifyTasksOrphaned).
+ * luồng deactivate. Ba hook point từ use-case: CreateTask (notifyAssigned), ReassignTask
+ * (notifyReassigned), Users.deactivate (notifyTasksOrphaned). Hook thứ tư (notifyOverdueDigest)
+ * phát từ lịch định kỳ, không từ use-case.
  */
 export interface Notifier {
   notifyAssigned(event: AssignedEvent): Promise<void>;
   notifyReassigned(event: ReassignedEvent): Promise<void>;
   notifyTasksOrphaned(event: TasksOrphanedEvent): Promise<void>;
+  notifyOverdueDigest(event: OverdueDigestEvent): Promise<void>;
 }

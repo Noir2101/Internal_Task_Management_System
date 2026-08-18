@@ -55,6 +55,10 @@ class SpyNotifier implements Notifier {
   notifyTasksOrphaned(): Promise<void> {
     return Promise.resolve();
   }
+  // Hook thứ tư (GĐ11 slice 2) phát từ lịch định kỳ, không từ use-case — CreateTask không đụng tới.
+  notifyOverdueDigest(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 describe('CreateTask — notify-on-assign (seam)', () => {

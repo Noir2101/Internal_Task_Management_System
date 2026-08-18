@@ -5,8 +5,8 @@
 > Nó KHÔNG định nghĩa lại luật nghiệp vụ và KHÔNG sửa hợp đồng đã đông cứng (`docs/00–06`).
 > Cũng như Giai đoạn 10, đây là lớp đặt lên trên một hệ thống đã hoàn chỉnh, và cũng như các tài
 > liệu trước, nó ghi rõ lý do và đánh đổi cho mỗi quyết định.
-> Giai đoạn này chia làm bốn slice. Slice 1 đã ship và được mô tả đầy đủ ở §3. Slice 2 tới 4 mới ở
-> mức phác thảo (§6), sẽ có mini-design riêng khi tới lượt build.
+> Giai đoạn này chia làm bốn slice. Slice 1 đã ship và được mô tả đầy đủ ở mục 3, slice 2 ở mục 6 và
+> 7. Slice 3 với 4 còn ở mức phác thảo (mục 8), sẽ có mini-design riêng khi tới lượt build.
 
 ---
 
@@ -23,6 +23,13 @@
 | resolver (bộ phân giải tên) | Cấu hình chỉ cho Nginx hỏi DNS ở đâu và bao lâu hỏi lại. Quyết định Nginx thấy được bao nhiêu replica. |
 | round-robin (chia lượt vòng) | Cách chia tải xoay vòng đều qua từng địa chỉ đích. |
 | control run (lượt đối chứng) | Lượt đo chạy với đúng một biến bị tắt, để chứng minh kết quả đến từ biến đó chứ không từ thứ khác. |
+| queue (hàng đợi) | Danh sách việc cần làm nằm ngoài tiến trình. Bên này ghi vào, bên kia lấy ra làm sau. |
+| job (việc) | Một đơn vị việc trong hàng đợi, gồm tên và dữ liệu kèm theo. |
+| producer (bên ghi) | Phía đẩy job vào hàng đợi. Ở đây là đường request. |
+| worker (bên chạy) | Phía lấy job ra và thực thi. Ở đây là chính tiến trình backend, nhưng ngoài đường request. |
+| repeatable job (job lặp lịch) | Job do một lịch trong Redis tự sinh ra theo chu kỳ, thay vì do ai đó gọi. |
+| digest (thư tổng hợp) | Một email gộp nhiều mục thay vì mỗi mục một email. |
+| decorator (lớp bọc) | Một hiện thực của interface, bọc quanh một hiện thực khác để thêm hành vi mà không sửa nó. |
 
 ---
 
@@ -259,13 +266,265 @@ nhập thật qua proxy được, cookie refresh vẫn ở `Path=/api/v1/auth`, 
 
 ---
 
-## 6. Phác các slice còn lại
+## 6. Slice 2 — BullMQ đẩy email ra khỏi đường request
 
-Ba slice sau đều dựa trên chính service `redis` mà slice 1 vừa thêm. Mỗi slice sẽ có mini-design
+### 6.1. Vấn đề: một request ghi task phải chờ SMTP
+
+`docs/07.A` mục 5 chốt cơ chế thông báo là **await rồi nuốt lỗi**, và ghi thẳng đánh đổi của nó:
+"request phải chờ SMTP trả về. Với volume nội bộ thì chấp nhận được. Queue hay outbox bền hơn nhưng
+thêm hạ tầng, vượt phạm vi tính năng bonus."
+
+Slice 1 vừa thêm service `redis` vào compose, nên vế "thêm hạ tầng" không còn đúng nữa. Cái giá thì
+đo được: `POST /tasks` giao việc cho người khác mất **khoảng 2,75 giây**, gần như toàn bộ là vòng
+đi về tới SMTP của provider. Người dùng chờ ngần ấy để nhận về một task đã ghi xong từ lâu.
+
+Slice này làm hai việc. Một là đẩy việc gửi sang một worker chạy ngoài đường request. Hai là thêm
+một job định kỳ quét task quá hạn theo nhóm rồi gửi digest cho leader.
+
+### 6.2. Quyết định đã chốt
+
+| # | Quyết định | Chọn | Lý do gọn |
+|---|---|---|---|
+| 1 | Thư viện hàng đợi | `@nestjs/bullmq` cộng `bullmq` v6 | BullMQ đứng trên chính Redis đã có; binding Nest là của cùng tổ chức |
+| 2 | Chỗ đặt lớp queue | Sau seam `Notifier`, dạng decorator | Use-case không phải biết có queue hay không (mục 6.3) |
+| 3 | Cách bật | Theo sự có mặt của `REDIS_URL`, quyết ở metadata module | BullMQ không có bản in-memory, và không hoãn được sang lúc chạy (mục 6.6) |
+| 4 | Lịch chạy định kỳ | Repeatable job của BullMQ, **không** `@nestjs/schedule` | `@Cron` bắn trên mọi replica, leader nhận N bản trùng (mục 6.5) |
+| 5 | Đường quét task quá hạn | `TaskQueryPort.list` với `overdue: true` | Dùng chung đúng predicate với cờ `overdue` và với Stats (mục 6.4) |
+| 6 | Lỗi gửi ở worker | Ném ra cho BullMQ retry, không nuốt | Nuốt thì `attempts` chỉ là trang trí (mục 6.7) |
+
+### 6.3. Queue nằm sau seam, không nằm trước
+
+Điểm móc đã có sẵn từ `docs/07.A` là port `Notifier`. Slice này gắn vào đúng chỗ đó, nên
+`CreateTask`, `ReassignTask` và `Users.deactivate` **không sửa một dòng nào**. Chúng vẫn inject
+`NOTIFIER` và gọi đúng các method cũ. Thứ đổi là cái nằm sau token đó.
+
+```
+CreateTask ──inject NOTIFIER──> QueuedNotifier ──queue.add()──> Redis
+                                                                  │
+                                            worker (một replica)  ▼
+                                   NotificationsProcessor ──> DIRECT_NOTIFIER ──> SMTP
+```
+
+Có hai token thay vì một, và lý do rất cụ thể. `NOTIFIER` là cái use-case nhìn thấy.
+`DIRECT_NOTIFIER` là adapter gửi thật. Nếu worker cũng gọi `NOTIFIER` thì mỗi job xử lý xong lại ghi
+thêm một job y hệt, tức một vòng lặp vô tận. Tách token cắt đứt vòng đó bằng cấu trúc chứ không bằng
+kỷ luật.
+
+Một provider phủ được cả hai thế giới nhờ cờ `rethrow` bám theo việc queue có bật hay không:
+
+| Queue | `NOTIFIER` là | Người tiêu thụ `DIRECT_NOTIFIER` | `rethrow` |
+|---|---|---|---|
+| tắt | chính `DIRECT_NOTIFIER` | use-case, đang trong đường request | `false`, nuốt lỗi như trước |
+| bật | `QueuedNotifier` | worker, đã ngoài đường request | `true`, ném cho BullMQ retry |
+
+Payload của job chỉ mang ID và chuỗi ISO, không mang email. Đây là kỷ luật "event mang ID" của
+`docs/07.A` mục 3, và hệ quả phụ là không địa chỉ email nào nằm trong Redis.
+
+### 6.4. Digest quá hạn: hook thứ tư trên port
+
+Port `Notifier` lên bốn method. Ba method cũ phát từ use-case; `notifyOverdueDigest` phát từ lịch
+định kỳ nằm ở infrastructure.
+
+Đặt digest sau port thay vì dựng một service riêng là để **dùng lại ba thứ đã có**: cờ
+`MAIL_ENABLED` chọn adapter, bất biến nuốt lỗi, và lớp bọc queue. Một service riêng phải chép lại cả
+ba. Đây cũng đúng nước đi mà `docs/07.A` đã làm khi thêm `notifyAssigned`, kèm đúng nghĩa vụ giấy tờ
+là đồng bộ `src/tasks/CLAUDE.md`.
+
+Việc quét đi qua `TaskQueryPort.list`, **không** qua repository:
+
+```ts
+this.query.list({ scopeTeamId: teamId, now, overdue: true, skip: 0, take: 10 });
+```
+
+`overduePredicate` vẫn là hàm private của `prisma-task.repository.ts` và phải giữ nguyên như vậy.
+Đường `list` với `overdue: true` đã dùng đúng predicate đó qua `buildListWhere`, nên digest không thể
+lệch định nghĩa OVERDUE với cờ `overdue` của `GET /tasks` hay với `byAssignee.overdue` của Stats. Nếu
+export predicate ra để digest gọi thẳng thì có ngay hai đường vào cùng một luật, và hai đường thì
+sớm muộn cũng lệch.
+
+`total` trả về là số quá hạn đầy đủ, còn `items` chỉ là mười dòng đầu để dựng thân thư; phần dư gộp
+thành một dòng "và N task khác" chứ không cắt cụt trong im lặng.
+
+Hai trường hợp cố ý **không** gửi. Nhóm không có leader đang hoạt động thì không có người nhận, chỉ
+ghi log. Nhóm sạch nợ (`total` bằng 0) thì im lặng, vì một thư báo "không có gì quá hạn" gửi mỗi
+sáng là cách nhanh nhất để người ta lọc bỏ toàn bộ kênh thông báo này.
+
+Phạm vi không bị nới: `scopeTeamId` truyền vào là nhóm của chính leader nhận thư, nên leader chỉ
+nhận đúng những task họ vốn thấy ở `GET /tasks`.
+
+### 6.5. Lịch chạy một lần dù có bao nhiêu replica
+
+Đây là chỗ dễ sai nhất của slice, và nó sai theo kiểu im lặng.
+
+`@Cron` của `@nestjs/schedule` sống trong tiến trình. Chạy N replica thì tới giờ có N lần bắn, và
+leader nhận N bản digest giống hệt nhau. Muốn dùng nó thì phải tự viết thêm một khoá phân tán, tức
+tự dựng lại đúng thứ mà Redis đã có sẵn. Vì vậy slice này **không thêm `@nestjs/schedule`**.
+
+Repeatable job của BullMQ đặt lịch ở Redis dưới một id. Mọi replica cùng `upsert` một id thì kết quả
+vẫn là một lịch, mỗi lần đến hạn sinh một job, và đúng một worker giành được job đó.
+
+```ts
+await queue.upsertJobScheduler(
+  'overdue-digest',
+  { pattern: config.get('OVERDUE_DIGEST_CRON') ?? '0 1 * * *', tz: 'UTC' },
+  { name: 'overdue-digest-sweep', opts: { removeOnComplete: { count: 50 } } },
+);
+```
+
+Mặc định là 01:00 UTC hằng ngày, tức 08:00 giờ Việt Nam, ghi đè bằng biến `OVERDUE_DIGEST_CRON`. Múi
+giờ ghi tường minh là UTC vì hợp đồng dùng ISO-8601 UTC ở mọi nơi, và giờ gửi thư không nên phụ
+thuộc múi giờ của container.
+
+Lượt quét chốt **một** mốc `now` từ `Clock` rồi phát cho mọi nhóm, đúng cổng cơ học 3. Mốc đó đi qua
+hàng đợi dưới dạng chuỗi ISO-8601 trong payload job, nên "mọi nhóm dùng chung một mốc" là thứ soi
+được bằng mắt khi đọc job chứ không phải chỉ tin vào code.
+
+Redis chết lúc bootstrap thì bộ đăng ký lịch ném lỗi và app không lên. Cố ý, cùng triết lý fail-fast
+của `createSmtpTransport` ở `docs/07.A` mục 7: lên được mà lịch câm là kiểu hỏng không ai phát hiện ra.
+
+### 6.6. Không có Redis thì sao
+
+Slice 1 hoãn được quyết định sang lúc chạy, vì `resolveThrottlerStorage` trả `undefined` là hợp lệ và
+thư viện tự dựng bản in-memory. BullMQ không cho làm vậy. Nó không có bản in-memory, và tệ hơn:
+`Queue` mặc định bật `enableOfflineQueue` cùng `maxRetriesPerRequest: null`, nên `queue.add()` lúc
+vắng Redis sẽ **treo vĩnh viễn** chứ không reject. Đăng ký vô điều kiện là làm treo cả
+`npm run start:dev` lẫn lưới e2e ngay lúc khởi tạo.
+
+Vì vậy quyết định phải nằm ở **metadata module**, không ở runtime. `tasks.module.ts` đọc `REDIS_URL`
+rồi spread vào `imports` và `providers` hai mảng có thể rỗng.
+
+| Môi trường | `REDIS_URL` | `NOTIFIER` | Digest |
+|---|---|---|---|
+| `npm run start:dev` | không đặt | adapter trực tiếp | không chạy |
+| `npm test` | không dựng app | không liên quan | không chạy |
+| `npm run test:e2e` | ép chuỗi rỗng | adapter trực tiếp, tức `NoopNotifier` | không chạy |
+| `docker compose` | `redis://redis:6379` | `QueuedNotifier` | chạy |
+
+Đọc env ở thời điểm dựng metadata kéo theo một chi tiết dễ trượt. Thời điểm đó nằm **trước** khi
+`ConfigModule.forRoot()` trong `app.module.ts` nạp `.env`, vì require chạy theo thứ tự import và
+decorator của module con áp trước module cha. Không xử lý thì `REDIS_URL` đặt trong `.env` bật được
+throttle store của slice 1 nhưng lại im lặng không bật queue, tức một biến mà hai cơ chế hiểu khác
+nhau. Cách xử lý là nạp `dotenv/config` ngay dòng đầu `src/main.ts`.
+
+Lưới e2e không dựa vào thứ tự đó. `test/setup/env.ts` **gán** `REDIS_URL` thành chuỗi rỗng. Chi tiết
+"gán chứ không `delete`" là bắt buộc, xem mục 7.4.
+
+### 6.7. Đánh đổi và rủi ro đã lường
+
+- **Redis chết lúc đang chạy thì thông báo mất, kèm log lỗi.** `QueuedNotifier` bọc `queue.add` trong
+  try/catch, vì nếu để `add` reject thì `CreateTask` vỡ, tức tái tạo đúng cái mà bất biến
+  `docs/07.A` mục 5 cấm. Cố ý **không** có đường lặng lẽ rơi về gửi đồng bộ: như vậy là dựng lại
+  chính đường request-chậm mà slice này đang gỡ đi, và lặp lại lỗi tư duy mà slice 1 đã từ chối.
+- **Bất biến "email không vỡ task-write" đổi chỗ đứng, không đổi nội dung.** Trước slice này, chỗ bảo
+  vệ nó là `EmailNotifier`. Giờ trên đường có queue, chỗ bảo vệ là `QueuedNotifier` ở phía ghi job,
+  còn adapter ở phía worker cố tình ném. Câu chữ tuyệt đối "`notify*` không bao giờ reject" trong
+  `docs/07.A` mục 5 vì vậy phải đọc kèm mục này.
+- **Retry chỉ áp cho lỗi gửi, không áp cho lỗi ghi job.** Job hỏng thử lại ba lần với backoff hàm mũ
+  rồi nằm lại `failed` để soi. Còn nếu Redis chết ngay lúc ghi thì không có job nào tồn tại để mà
+  thử lại; đó là đánh đổi ở gạch đầu dòng đầu.
+- **Digest không có test tự động.** Giữ đúng lệ đã ghi ở `docs/08` mục 6 cho 429: thứ phụ thuộc lịch
+  và trạng thái cộng dồn thì nhét vào lưới e2e sẽ gây flaky. Phần logic thuần có test unit; phần
+  chạy thật kiểm bằng smoke tay ở mục 7.
+- **`bullmq` v6 cộng `ioredis` v5.** Peer của `@nestjs/bullmq` v11 nhận `bullmq` từ v3 tới v6, và
+  `ioredis` vẫn dùng chung đúng bản đã ghim ở slice 1 nên không phát sinh bản thứ hai.
+
+---
+
+## 7. Kiểm chứng đã chạy (slice 2)
+
+Cổng cơ học trước tiên: `npm run lint`, `npm run build`, `npm test` (**73**, tăng từ 49),
+`npm run test:e2e` (**42**, không đổi). Cả hai lưới test chạy với Redis không tham gia.
+
+### 7.1. Đường request không còn chờ SMTP
+
+Hai lượt trên cùng một stack, cùng `MAIL_ENABLED=true` trỏ provider thật, chỉ khác đúng một biến là
+`REDIS_URL`. Leader tạo task giao cho member, đo `time_total` của `POST /tasks` qua Nginx ở cổng 8080.
+
+| Lượt | `REDIS_URL` | Đường gửi | `time_total` (3 lần) |
+|---|---|---|---|
+| Đối chứng | rỗng | đồng bộ trong request | 2,922 · 2,750 · 2,712 giây |
+| Slice 2 | `redis://redis:6379` | ghi job rồi trả | 0,016 · 0,011 · 0,011 giây |
+
+Khoảng 2,75 giây xuống khoảng 11 mili giây, tức nhanh hơn chừng **250 lần**. Lượt đối chứng là phần
+bắt buộc: chỉ đo lượt có queue thì con số vẫn đẹp mà không chứng minh được nó đến từ đâu.
+
+### 7.2. Thư vẫn đi, và retry là thật
+
+Nhanh hơn mà mất thư thì là hỏng, nên phải kiểm phía worker. Log cho thấy worker nhận job và nói
+chuyện SMTP thật; provider ở chế độ sandbox chỉ nhận địa chỉ của chủ tài khoản nên trả 550 cho các
+địa chỉ `@demo.local`:
+
+```
+ERROR [Notifier] Gửi email thất bại ở notifyAssigned (target=tjg8c0iq...):
+  Message failed: 550 You can only send testing emails to your own email address
+```
+
+Mỗi job hỏng xuất hiện **đúng ba lần** với khoảng cách giãn dần, rồi nằm lại `failed`. Đó chính là
+`attempts: 3` cộng backoff hàm mũ đang chạy, và nó chỉ chạy được vì adapter đường worker ném lỗi thay
+vì nuốt. Nếu nuốt thì mỗi job xuất hiện một lần và trạng thái là `completed`.
+
+Chiều ngược lại cũng có đối chứng trong cùng lượt đo. Leader nhóm Backend trong dữ liệu seed của máy
+đo là một hộp thư thật, nên job digest gửi cho nhóm đó **completed** và thư tới thật. Leader nhóm
+Frontend là `fe.lead@demo.local` nên job đó `failed` sau ba lần thử. Cùng một cơ chế, hai kết cục,
+đúng theo địa chỉ người nhận.
+
+### 7.3. Lịch chạy đúng một lần trên hai replica
+
+Đây là phép đo trả lời câu hỏi ở mục 6.5.
+
+```bash
+OVERDUE_DIGEST_CRON="*/1 * * * *" docker compose up -d --build --scale backend=2
+docker logs <mỗi replica> | grep "digest sweep"
+```
+
+| Replica | Các mốc đã chạy |
+|---|---|
+| `12d6fd686924` | 17:33:00 · 17:36:00 |
+| `1a5b47e7c200` | 17:34:00 · 17:35:00 |
+
+Bốn chu kỳ liên tiếp, **mỗi mốc xuất hiện đúng một lần**, và không mốc nào xuất hiện ở cả hai replica.
+Đồng thời cả hai replica đều có lượt chạy, nghĩa là cả hai đều là worker hợp lệ chứ không phải một
+cái nằm không. Với `@Cron` thì mỗi mốc phải xuất hiện hai lần.
+
+Phía Redis, zset lịch có **đúng một** entry tên `overdue-digest`, và ngoài giờ chạy thì job kế tiếp
+nằm ở `delayed` chờ mốc 01:00 UTC.
+
+### 7.4. Lưới e2e không còn gửi email thật
+
+Trong lúc kiểm chứng, một lỗi cũ đã ghi ở `docs/implementation-log.md` được đóng lại.
+
+`test/setup/env.ts` dùng `delete process.env.MAIL_ENABLED` với ý định tắt email trong lưới e2e. Nó
+làm **ngược** điều nó định làm. `ConfigModule.forRoot()` điền biến từ `.env` qua bộ lọc
+`!(key in process.env)`, tức chỉ chừa ra key đã tồn tại. `delete` làm key biến mất, nên dotenv thấy
+chỗ trống rồi điền `MAIL_ENABLED=true` của máy dev vào. Hệ quả: mỗi lần e2e tạo task, reassign hay
+deactivate, lưới test bắn email thật qua provider.
+
+Sửa bằng cách **gán** giá trị falsy thay vì xoá. Cùng lý do đó, `REDIS_URL` cũng gán chuỗi rỗng chứ
+không `delete`, và điều này khoá luôn cả đường Redis của throttle store slice 1 trong lưới e2e.
+
+```
+delete  → MAIL_ENABLED="true"   (dotenv điền vào chỗ trống)
+gán     → MAIL_ENABLED="false"  (dotenv chừa key đã có)
+```
+
+### 7.5. Hợp đồng không suy suyển
+
+Rà lại sau khi động vào compose: đăng nhập thật qua proxy được, cookie refresh vẫn ở
+`Path=/api/v1/auth`, query string giữ nguyên (`?page=2&limit=3` về đúng `meta.page` là 2 và
+`meta.limit` là 3), `/api/v1/docs` mở được, SPA fallback trả `index.html` cho `/tasks`.
+
+Riêng `GET /stats` đáng nhìn kỹ vì digest động tới khái niệm OVERDUE: trả về `total` là 6 và
+`overdue` là 4, `byProgress` vẫn đúng ba key và `overdue` vẫn là sibling nằm ngoài `total`. Không
+endpoint mới, không mã lỗi mới, không field mới, không migration.
+
+---
+
+## 8. Phác các slice còn lại
+
+Hai slice sau đều dựa trên chính service `redis` mà slice 1 đã thêm. Mỗi slice sẽ có mini-design
 riêng khi tới lượt build; phần này chỉ chốt phạm vi để không trôi.
 
 | Slice | Nội dung | Điểm móc đã có sẵn |
 |---|---|---|
-| 2 | BullMQ đẩy email ra khỏi đường request, cộng cron quét việc quá hạn gửi digest cho leader | Port `Notifier` ở `src/tasks/application/ports/notifier.port.ts`; `overduePredicate` ở repository |
 | 3 | Log có cấu trúc bằng `nestjs-pino`, lấy `requestId` làm trường correlation | `src/common/request-id.middleware.ts` đã sinh và gắn sẵn `requestId` |
 | 4 | Audit log chỉ ghi thêm cho deactivate, reactivate, đổi leader, đổi assignee và xoá task | Migration đi qua `/migrate`; độc lập với break-glass, không đụng vào nó |

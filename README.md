@@ -115,6 +115,9 @@ Bốn model: `User`, `Team`, `Task`, `RefreshToken`. Điểm chính:
   `migrate deploy → seed-if-empty → node dist/main`.
 - **Mở rộng ngang** — backend stateless; trạng thái dùng chung duy nhất ngoài Postgres là bộ đếm
   throttle, đặt ở Redis. nginx phân giải tên qua DNS Docker lúc chạy nên nhận đủ mọi replica.
+- **Việc nền qua hàng đợi** — email thông báo rời khỏi đường request sang worker BullMQ (`POST /tasks`
+  đo được từ ~2,75 giây xuống ~11 mili giây), cộng một job định kỳ gửi leader thư tổng hợp task quá
+  hạn. Lịch nằm ở Redis nên chạy bao nhiêu replica cũng chỉ gửi một lần.
 
 ### Ghi chú demo
 - **Swagger để mở** ở `/api/v1/docs` chỉ để demo;
@@ -122,6 +125,9 @@ Bốn model: `User`, `Team`, `Task`, `RefreshToken`. Điểm chính:
 - **Throttle bật** ở prod (login ~5 lần/phút/IP); `THROTTLE_DISABLED` chỉ dành cho e2e.
   Bộ đếm ở Redis khi có `REDIS_URL` (compose tự đặt), rơi về in-memory khi không có — nên `npm test`
   và `npm run start:dev` không cần Redis.
+- **Hàng đợi thông báo** cũng bật theo chính `REDIS_URL` đó. Không có Redis thì email gửi thẳng trong
+  request như trước và không có digest, nên dev với test vẫn chạy được mà không cần dựng gì thêm.
+  Lịch digest mặc định 01:00 UTC, đổi bằng `OVERDUE_DIGEST_CRON`.
 - **Cookie `Secure`** bật (`NODE_ENV=production`) và vẫn chạy qua `http://localhost` vì `localhost` là
   secure-context. Truy cập qua IP LAN nằm ngoài phạm vi demo.
 - Bí mật đi qua biến môi trường (xem [`.env.example`](.env.example)); giá trị mặc định trong compose là
